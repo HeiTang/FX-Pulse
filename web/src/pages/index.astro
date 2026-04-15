@@ -1,17 +1,235 @@
 ---
+import '../styles/global.css';
+import ratesData from '../data/rates.json';
 
+const { meta, rates } = ratesData;
+const dates = Object.keys(rates).sort();
+const latestDate = dates[dates.length - 1];
+const latestRates = rates[latestDate as keyof typeof rates]?.VISA ?? {};
+
+const currencyInfo: Record<string, { flag: string; name: string }> = {
+  USD: { flag: '🇺🇸', name: '美元' },
+  JPY: { flag: '🇯🇵', name: '日圓' },
+  EUR: { flag: '🇪🇺', name: '歐元' },
+  GBP: { flag: '🇬🇧', name: '英鎊' },
+  HKD: { flag: '🇭🇰', name: '港幣' },
+  AUD: { flag: '🇦🇺', name: '澳幣' },
+  KRW: { flag: '🇰🇷', name: '韓元' },
+  SGD: { flag: '🇸🇬', name: '新加坡幣' },
+};
+
+function formatRate(rate: number): string {
+  return rate >= 1 ? rate.toFixed(4) : rate.toFixed(6);
+}
+
+// Pre-compute for template use
+const rateMap = latestRates as Record<string, { rate: number; reverse: number }>;
+const ratesJson = JSON.stringify(ratesData);
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FX Pulse — 匯率脈動</title>
+  </head>
+  <body class="bg-gray-950 text-gray-100 min-h-screen antialiased">
+    <!-- Header -->
+    <header class="border-b border-gray-800 px-6 py-4">
+      <div class="max-w-7xl mx-auto flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">💹</span>
+          <h1 class="text-xl font-bold tracking-tight">FX Pulse</h1>
+          <span class="text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded-full">VISA</span>
+        </div>
+        <div class="text-sm text-gray-400">
+          更新時間：<time class="text-gray-300">{latestDate}</time>
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-6 py-8 space-y-8">
+      <!-- Rate Cards -->
+      <section>
+        <h2 class="text-sm font-medium text-gray-400 mb-4 uppercase tracking-wider">即時匯率</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {meta.currencies.map((currency: string) => {
+            const info = currencyInfo[currency];
+            const rate = rateMap[currency];
+            return (
+              <button
+                data-currency={currency}
+                class="currency-card group relative bg-gray-900 border border-gray-800 rounded-xl p-4 text-left transition-all hover:border-indigo-500/50 hover:bg-gray-900/80 cursor-pointer"
+              >
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="text-lg">{info?.flag}</span>
+                  <span class="text-xs text-gray-400">{info?.name}</span>
+                </div>
+                <div class="text-lg font-mono font-semibold text-gray-100">
+                  {rate ? formatRate(rate.rate) : '—'}
+                </div>
+                <div class="text-xs text-gray-500 font-mono">
+                  1 TWD = {rate ? formatRate(rate.reverse) : '—'} {currency}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <!-- Chart Section -->
+      <section>
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wider">走勢圖表</h2>
+          <div id="active-currency" class="text-sm font-medium text-indigo-400"></div>
+        </div>
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+          <div id="chart" class="w-full" style="height: 400px;"></div>
+          <div id="chart-placeholder" class="hidden w-full flex items-center justify-center text-gray-500 text-sm" style="height: 400px;">
+            資料累積中，需至少 2 天數據才能繪製走勢圖
+          </div>
+        </div>
+      </section>
+
+      <!-- Footer -->
+      <footer class="text-center text-xs text-gray-600 pb-8">
+        資料來源：VISA Exchange Rate Calculator · 基準貨幣：TWD
+      </footer>
+    </main>
+
+    <script define:vars={{ ratesJson }}>
+      window.__FX_RATES__ = JSON.parse(ratesJson);
+    </script>
+
+    <script>
+      import * as echarts from 'echarts/core';
+      import { LineChart } from 'echarts/charts';
+      import {
+        TooltipComponent,
+        GridComponent,
+        DataZoomComponent,
+      } from 'echarts/components';
+      import { CanvasRenderer } from 'echarts/renderers';
+
+      echarts.use([
+        LineChart,
+        TooltipComponent,
+        GridComponent,
+        DataZoomComponent,
+        CanvasRenderer,
+      ]);
+
+      const ratesData = (window as any).__FX_RATES__ ?? {};
+      const dates = Object.keys(ratesData.rates ?? {}).sort();
+
+      const currencyNames = {
+        USD: '美元', JPY: '日圓', EUR: '歐元', GBP: '英鎊',
+        HKD: '港幣', AUD: '澳幣', KRW: '韓元', SGD: '新加坡幣',
+      } as Record<string, string>;
+
+      let chart: ReturnType<typeof echarts.init> | null = null;
+
+      function getSeriesData(currency: string) {
+        return dates.map((d: string) => ratesData.rates[d]?.VISA?.[currency]?.rate ?? null);
+      }
+
+      function buildOption(currency: string) {
+        const data = getSeriesData(currency);
+        return {
+          backgroundColor: 'transparent',
+          grid: { left: 60, right: 20, top: 20, bottom: 50 },
+          tooltip: {
+            trigger: 'axis' as const,
+            backgroundColor: 'rgba(15, 15, 25, 0.9)',
+            borderColor: '#333',
+            textStyle: { color: '#e5e7eb', fontSize: 12 },
+            formatter(params: any) {
+              const p = Array.isArray(params) ? params[0] : params;
+              const val = p.value != null ? p.value.toFixed(4) : '—';
+              return '<b>' + p.name + '</b><br/>1 ' + currency + ' = <b>' + val + '</b> TWD';
+            },
+          },
+          xAxis: {
+            type: 'category' as const,
+            data: dates,
+            axisLabel: { color: '#6b7280', fontSize: 11 },
+            axisLine: { lineStyle: { color: '#374151' } },
+          },
+          yAxis: {
+            type: 'value' as const,
+            scale: true,
+            splitLine: { lineStyle: { color: '#1f2937' } },
+            axisLabel: { color: '#6b7280', fontSize: 11 },
+          },
+          dataZoom: [{ type: 'inside' as const, start: 0, end: 100 }],
+          series: [{
+            type: 'line' as const,
+            data,
+            smooth: true,
+            symbol: 'circle',
+            symbolSize: 6,
+            lineStyle: { color: '#6366f1', width: 2 },
+            itemStyle: { color: '#6366f1' },
+            areaStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: 'rgba(99, 102, 241, 0.3)' },
+                { offset: 1, color: 'rgba(99, 102, 241, 0.02)' },
+              ]),
+            },
+          }],
+        };
+      }
+
+      function renderChart(currency: string) {
+        const chartEl = document.getElementById('chart')!;
+        const placeholder = document.getElementById('chart-placeholder')!;
+
+        if (dates.length < 2) {
+          chartEl.classList.add('hidden');
+          placeholder.classList.remove('hidden');
+          return;
+        }
+
+        chartEl.classList.remove('hidden');
+        placeholder.classList.add('hidden');
+
+        if (!chart) {
+          chart = echarts.init(chartEl);
+        }
+        chart.setOption(buildOption(currency), true);
+      }
+
+      function setActive(currency: string) {
+        document.querySelectorAll('.currency-card').forEach((el) => {
+          const c = (el as HTMLElement).dataset.currency;
+          if (c === currency) {
+            el.classList.add('border-indigo-500', 'bg-gray-800/50');
+            el.classList.remove('border-gray-800');
+          } else {
+            el.classList.remove('border-indigo-500', 'bg-gray-800/50');
+            el.classList.add('border-gray-800');
+          }
+        });
+
+        const label = document.getElementById('active-currency');
+        if (label) {
+          label.textContent = currency + ' — ' + (currencyNames[currency] ?? currency);
+        }
+
+        renderChart(currency);
+      }
+
+      document.querySelectorAll('.currency-card').forEach((el) => {
+        el.addEventListener('click', () => {
+          const currency = (el as HTMLElement).dataset.currency;
+          if (currency) setActive(currency);
+        });
+      });
+
+      window.addEventListener('resize', () => chart?.resize());
+
+      setActive('USD');
+    </script>
+  </body>
 </html>
