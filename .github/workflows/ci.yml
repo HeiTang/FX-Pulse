@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "api/**"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "api/**"
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Cache Poetry virtualenv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pypoetry/virtualenvs
+          key: poetry-${{ runner.os }}-${{ hashFiles('api/poetry.lock') }}
+
+      - name: Install dependencies
+        run: poetry install
+
+      - name: Ruff lint
+        run: poetry run ruff check src/ tests/
+
+      - name: Ruff format check
+        run: poetry run ruff format --check src/ tests/
+
+      - name: Run tests
+        run: poetry run pytest -v
