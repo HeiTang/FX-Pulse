@@ -7,8 +7,12 @@ import sys
 from datetime import UTC, datetime
 
 from .models.rate import CurrencyRate
+from .scraper.base import BaseScraper
+from .scraper.mastercard import MastercardScraper
 from .scraper.visa import VisaScraper
 from .store import get_store
+
+log = logging.getLogger(__name__)
 
 
 def _setup_logging() -> None:
@@ -26,10 +30,16 @@ def main() -> None:
     now = datetime.now(UTC)
     date_key = now.strftime("%Y-%m-%d")
 
-    scraper = VisaScraper()
-    raw = scraper.fetch_all(now)
-
-    rates = {currency: CurrencyRate(**values) for currency, values in raw.items()}
-
+    scrapers: list[BaseScraper] = [VisaScraper(), MastercardScraper()]
     store = get_store()
-    store.upsert_rates(date_key, scraper.source_name, rates)
+
+    for scraper in scrapers:
+        try:
+            raw = scraper.fetch_all(now)
+            rates = {currency: CurrencyRate(**values) for currency, values in raw.items()}
+            store.upsert_rates(date_key, scraper.source_name, rates)
+        except Exception:
+            log.exception(
+                "Scraper %s failed — continuing with remaining scrapers",
+                scraper.source_name,
+            )
