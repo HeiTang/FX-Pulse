@@ -19,19 +19,32 @@ const currencyInfo: Record<string, { flag: string; name: string }> = {
 };
 
 type RateEntry = { rate: number; reverse: number };
-const visaRates = (latestDay as Record<string, Record<string, RateEntry>>)?.VISA ?? {};
-const mcRates = (latestDay as Record<string, Record<string, RateEntry>>)?.Mastercard ?? {};
+const allSources = ['VISA', 'Mastercard', 'JCB'] as const;
+const sourceRates: Record<string, Record<string, RateEntry>> = {};
+for (const src of allSources) {
+  sourceRates[src] = (latestDay as Record<string, Record<string, RateEntry>>)?.[src] ?? {};
+}
 
 function fmt(rate: number): string {
   return rate >= 1 ? rate.toFixed(4) : rate.toFixed(6);
 }
 
-// Per-currency: which source is lowest (best) / highest
-function bestSource(currency: string): string | null {
-  const v = visaRates[currency]?.rate;
-  const m = mcRates[currency]?.rate;
-  if (!v || !m) return null;
-  return v <= m ? 'VISA' : 'Mastercard';
+// Per-currency: which source has the lowest rate (best for cardholder)
+function rateRank(currency: string): Record<string, 'best' | 'worst' | null> {
+  const vals = allSources
+    .map((s) => ({ src: s, rate: sourceRates[s][currency]?.rate }))
+    .filter((v) => v.rate != null && v.rate > 0);
+  if (vals.length < 2) return Object.fromEntries(allSources.map((s) => [s, null]));
+  const min = Math.min(...vals.map((v) => v.rate!));
+  const max = Math.max(...vals.map((v) => v.rate!));
+  const result: Record<string, 'best' | 'worst' | null> = {};
+  for (const s of allSources) {
+    const r = sourceRates[s][currency]?.rate;
+    if (r === min) result[s] = 'best';
+    else if (r === max) result[s] = 'worst';
+    else result[s] = null;
+  }
+  return result;
 }
 
 const ratesJson = JSON.stringify(ratesData);
@@ -70,6 +83,9 @@ const ratesJson = JSON.stringify(ratesData);
         <button data-source="Mastercard" class="source-tab px-4 py-1.5 rounded-full text-sm font-medium transition-all text-gray-400 border border-gray-700 hover:border-gray-500">
           Mastercard
         </button>
+        <button data-source="JCB" class="source-tab px-4 py-1.5 rounded-full text-sm font-medium transition-all text-gray-400 border border-gray-700 hover:border-gray-500">
+          JCB
+        </button>
       </div>
 
       <!-- Rate Cards -->
@@ -78,9 +94,12 @@ const ratesJson = JSON.stringify(ratesData);
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {meta.currencies.map((currency: string) => {
             const info = currencyInfo[currency];
-            const v = visaRates[currency];
-            const m = mcRates[currency];
-            const best = bestSource(currency);
+            const rank = rateRank(currency);
+            const sourceLabels = [
+              { key: 'VISA', label: 'VISA', color: 'text-indigo-400' },
+              { key: 'Mastercard', label: 'Mastercard', color: 'text-amber-400' },
+              { key: 'JCB', label: 'JCB', color: 'text-rose-400' },
+            ];
             return (
               <button
                 data-currency={currency}
@@ -91,20 +110,19 @@ const ratesJson = JSON.stringify(ratesData);
                   <span class="text-sm font-medium text-gray-300">{currency}</span>
                   <span class="text-xs text-gray-500">{info?.name}</span>
                 </div>
-                {/* VISA rate */}
-                <div class="flex items-center justify-between mb-1 source-row" data-row-source="VISA">
-                  <span class="text-xs text-indigo-400">VISA</span>
-                  <span class:list={['rate-value text-base font-mono font-semibold', best === 'VISA' ? 'text-emerald-400' : best === 'Mastercard' ? 'text-red-400' : 'text-gray-100']}>
-                    {v ? fmt(v.rate) : '—'}
-                  </span>
-                </div>
-                {/* Mastercard rate */}
-                <div class="flex items-center justify-between mb-2 source-row" data-row-source="Mastercard">
-                  <span class="text-xs text-amber-400">Mastercard</span>
-                  <span class:list={['rate-value text-base font-mono font-semibold', best === 'Mastercard' ? 'text-emerald-400' : best === 'VISA' ? 'text-red-400' : 'text-gray-100']}>
-                    {m ? fmt(m.rate) : '—'}
-                  </span>
-                </div>
+                {sourceLabels.map((s) => {
+                  const rate = sourceRates[s.key]?.[currency];
+                  const r = rank[s.key];
+                  const rateClass = r === 'best' ? 'text-emerald-400' : r === 'worst' ? 'text-red-400' : 'text-gray-100';
+                  return (
+                    <div class="flex items-center justify-between mb-1 source-row" data-row-source={s.key}>
+                      <span class:list={['text-xs', s.color]}>{s.label}</span>
+                      <span class:list={['rate-value text-base font-mono font-semibold', rateClass]}>
+                        {rate ? fmt(rate.rate) : '—'}
+                      </span>
+                    </div>
+                  );
+                })}
               </button>
             );
           })}
@@ -127,7 +145,7 @@ const ratesJson = JSON.stringify(ratesData);
 
       <!-- Footer -->
       <footer class="text-center text-xs text-gray-600 pb-8">
-        資料來源：VISA / Mastercard Exchange Rate · 基準貨幣：TWD
+        資料來源：VISA / Mastercard / JCB Exchange Rate · 基準貨幣：TWD
       </footer>
     </main>
 
@@ -157,7 +175,7 @@ const ratesJson = JSON.stringify(ratesData);
 
       const ratesData = (window as any).__FX_RATES__ ?? {};
       const dates = Object.keys(ratesData.rates ?? {}).sort();
-      const sources = ['VISA', 'Mastercard'] as const;
+      const sources = ['VISA', 'Mastercard', 'JCB'] as const;
 
       const currencyNames = {
         USD: '美元', JPY: '日圓', EUR: '歐元', GBP: '英鎊',
@@ -167,6 +185,7 @@ const ratesJson = JSON.stringify(ratesData);
       const sourceColors = {
         VISA: { line: '#6366f1', area0: 'rgba(99, 102, 241, 0.25)', area1: 'rgba(99, 102, 241, 0.02)' },
         Mastercard: { line: '#f59e0b', area0: 'rgba(245, 158, 11, 0.20)', area1: 'rgba(245, 158, 11, 0.02)' },
+        JCB: { line: '#f43f5e', area0: 'rgba(244, 63, 94, 0.20)', area1: 'rgba(244, 63, 94, 0.02)' },
       } as Record<string, { line: string; area0: string; area1: string }>;
 
       let chart: ReturnType<typeof echarts.init> | null = null;
@@ -178,7 +197,7 @@ const ratesJson = JSON.stringify(ratesData);
       }
 
       function getVisibleSources(): string[] {
-        if (activeSource === 'all') return ['VISA', 'Mastercard'];
+        if (activeSource === 'all') return ['VISA', 'Mastercard', 'JCB'];
         return [activeSource];
       }
 
