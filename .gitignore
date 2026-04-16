@@ -20,7 +20,7 @@ pnpm-debug.log*
 
 # IDE
 .idea/
-.vscode/
+**/.vscode/
 
 # Python
 **/__pycache__/
