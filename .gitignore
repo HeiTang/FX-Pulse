@@ -20,15 +20,15 @@ pnpm-debug.log*
 
 # IDE
 .idea/
-.vscode/
+**/.vscode/
 
 # Python
-__pycache__/
+**/__pycache__/
 *.py[cod]
 *.egg-info/
-.ruff_cache/
-.pytest_cache/
-.mypy_cache/
+**/.ruff_cache/
+**/.pytest_cache/
+**/.mypy_cache/
 
 # Virtual environments
 .venv/
