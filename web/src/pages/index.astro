@@ -5,7 +5,7 @@ import ratesData from '../data/rates.json';
 const { meta, rates } = ratesData;
 const dates = Object.keys(rates).sort();
 const latestDate = dates[dates.length - 1];
-const latestRates = rates[latestDate as keyof typeof rates]?.VISA ?? {};
+const latestDay = rates[latestDate as keyof typeof rates] ?? {};
 
 const currencyInfo: Record<string, { flag: string; name: string }> = {
   USD: { flag: '🇺🇸', name: '美元' },
@@ -18,12 +18,22 @@ const currencyInfo: Record<string, { flag: string; name: string }> = {
   SGD: { flag: '🇸🇬', name: '新加坡幣' },
 };
 
-function formatRate(rate: number): string {
+type RateEntry = { rate: number; reverse: number };
+const visaRates = (latestDay as Record<string, Record<string, RateEntry>>)?.VISA ?? {};
+const mcRates = (latestDay as Record<string, Record<string, RateEntry>>)?.Mastercard ?? {};
+
+function fmt(rate: number): string {
   return rate >= 1 ? rate.toFixed(4) : rate.toFixed(6);
 }
 
-// Pre-compute for template use
-const rateMap = latestRates as Record<string, { rate: number; reverse: number }>;
+// Per-currency: which source is lowest (best) / highest
+function bestSource(currency: string): string | null {
+  const v = visaRates[currency]?.rate;
+  const m = mcRates[currency]?.rate;
+  if (!v || !m) return null;
+  return v <= m ? 'VISA' : 'Mastercard';
+}
+
 const ratesJson = JSON.stringify(ratesData);
 ---
 
@@ -41,7 +51,6 @@ const ratesJson = JSON.stringify(ratesData);
         <div class="flex items-center gap-3">
           <span class="text-2xl">💹</span>
           <h1 class="text-xl font-bold tracking-tight">FX Pulse</h1>
-          <span class="text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded-full">VISA</span>
         </div>
         <div class="text-sm text-gray-400">
           更新時間：<time class="text-gray-300">{latestDate}</time>
@@ -50,27 +59,51 @@ const ratesJson = JSON.stringify(ratesData);
     </header>
 
     <main class="max-w-7xl mx-auto px-6 py-8 space-y-8">
+      <!-- Source Tabs -->
+      <div class="flex gap-2">
+        <button data-source="all" class="source-tab px-4 py-1.5 rounded-full text-sm font-medium transition-all bg-indigo-500/20 text-indigo-400 border border-indigo-500/50">
+          全部
+        </button>
+        <button data-source="VISA" class="source-tab px-4 py-1.5 rounded-full text-sm font-medium transition-all text-gray-400 border border-gray-700 hover:border-gray-500">
+          VISA
+        </button>
+        <button data-source="Mastercard" class="source-tab px-4 py-1.5 rounded-full text-sm font-medium transition-all text-gray-400 border border-gray-700 hover:border-gray-500">
+          Mastercard
+        </button>
+      </div>
+
       <!-- Rate Cards -->
       <section>
         <h2 class="text-sm font-medium text-gray-400 mb-4 uppercase tracking-wider">即時匯率</h2>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {meta.currencies.map((currency: string) => {
             const info = currencyInfo[currency];
-            const rate = rateMap[currency];
+            const v = visaRates[currency];
+            const m = mcRates[currency];
+            const best = bestSource(currency);
             return (
               <button
                 data-currency={currency}
                 class="currency-card group relative bg-gray-900 border border-gray-800 rounded-xl p-4 text-left transition-all hover:border-indigo-500/50 hover:bg-gray-900/80 cursor-pointer"
               >
-                <div class="flex items-center gap-2 mb-2">
+                <div class="flex items-center gap-2 mb-3">
                   <span class="text-lg">{info?.flag}</span>
-                  <span class="text-xs text-gray-400">{info?.name}</span>
+                  <span class="text-sm font-medium text-gray-300">{currency}</span>
+                  <span class="text-xs text-gray-500">{info?.name}</span>
                 </div>
-                <div class="text-lg font-mono font-semibold text-gray-100">
-                  {rate ? formatRate(rate.rate) : '—'}
+                {/* VISA rate */}
+                <div class="flex items-center justify-between mb-1 source-row" data-row-source="VISA">
+                  <span class="text-xs text-indigo-400">VISA</span>
+                  <span class:list={['rate-value text-base font-mono font-semibold', best === 'VISA' ? 'text-emerald-400' : best === 'Mastercard' ? 'text-red-400' : 'text-gray-100']}>
+                    {v ? fmt(v.rate) : '—'}
+                  </span>
                 </div>
-                <div class="text-xs text-gray-500 font-mono">
-                  1 TWD = {rate ? formatRate(rate.reverse) : '—'} {currency}
+                {/* Mastercard rate */}
+                <div class="flex items-center justify-between mb-2 source-row" data-row-source="Mastercard">
+                  <span class="text-xs text-amber-400">Mastercard</span>
+                  <span class:list={['rate-value text-base font-mono font-semibold', best === 'Mastercard' ? 'text-emerald-400' : best === 'VISA' ? 'text-red-400' : 'text-gray-100']}>
+                    {m ? fmt(m.rate) : '—'}
+                  </span>
                 </div>
               </button>
             );
@@ -94,7 +127,7 @@ const ratesJson = JSON.stringify(ratesData);
 
       <!-- Footer -->
       <footer class="text-center text-xs text-gray-600 pb-8">
-        資料來源：VISA Exchange Rate Calculator · 基準貨幣：TWD
+        資料來源：VISA / Mastercard Exchange Rate · 基準貨幣：TWD
       </footer>
     </main>
 
@@ -109,6 +142,7 @@ const ratesJson = JSON.stringify(ratesData);
         TooltipComponent,
         GridComponent,
         DataZoomComponent,
+        LegendComponent,
       } from 'echarts/components';
       import { CanvasRenderer } from 'echarts/renderers';
 
@@ -117,37 +151,85 @@ const ratesJson = JSON.stringify(ratesData);
         TooltipComponent,
         GridComponent,
         DataZoomComponent,
+        LegendComponent,
         CanvasRenderer,
       ]);
 
       const ratesData = (window as any).__FX_RATES__ ?? {};
       const dates = Object.keys(ratesData.rates ?? {}).sort();
+      const sources = ['VISA', 'Mastercard'] as const;
 
       const currencyNames = {
         USD: '美元', JPY: '日圓', EUR: '歐元', GBP: '英鎊',
         HKD: '港幣', AUD: '澳幣', KRW: '韓元', SGD: '新加坡幣',
       } as Record<string, string>;
 
-      let chart: ReturnType<typeof echarts.init> | null = null;
+      const sourceColors = {
+        VISA: { line: '#6366f1', area0: 'rgba(99, 102, 241, 0.25)', area1: 'rgba(99, 102, 241, 0.02)' },
+        Mastercard: { line: '#f59e0b', area0: 'rgba(245, 158, 11, 0.20)', area1: 'rgba(245, 158, 11, 0.02)' },
+      } as Record<string, { line: string; area0: string; area1: string }>;
 
-      function getSeriesData(currency: string) {
-        return dates.map((d: string) => ratesData.rates[d]?.VISA?.[currency]?.rate ?? null);
+      let chart: ReturnType<typeof echarts.init> | null = null;
+      let activeCurrency = 'USD';
+      let activeSource: string = 'all';
+
+      function getSeriesData(currency: string, source: string) {
+        return dates.map((d: string) => ratesData.rates[d]?.[source]?.[currency]?.rate ?? null);
+      }
+
+      function getVisibleSources(): string[] {
+        if (activeSource === 'all') return ['VISA', 'Mastercard'];
+        return [activeSource];
       }
 
       function buildOption(currency: string) {
-        const data = getSeriesData(currency);
+        const visible = getVisibleSources();
+        const seriesList = visible.map((src) => {
+          const colors = sourceColors[src];
+          return {
+            name: src,
+            type: 'line' as const,
+            data: getSeriesData(currency, src),
+            smooth: true,
+            symbol: 'circle',
+            symbolSize: 5,
+            lineStyle: { color: colors.line, width: 2 },
+            itemStyle: { color: colors.line },
+            areaStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: colors.area0 },
+                { offset: 1, color: colors.area1 },
+              ]),
+            },
+          };
+        });
+
         return {
           backgroundColor: 'transparent',
-          grid: { left: 60, right: 20, top: 20, bottom: 50 },
+          grid: { left: 60, right: 20, top: 40, bottom: 50 },
+          legend: {
+            show: visible.length > 1,
+            top: 4,
+            right: 0,
+            textStyle: { color: '#9ca3af', fontSize: 12 },
+            itemWidth: 16,
+            itemHeight: 2,
+          },
           tooltip: {
             trigger: 'axis' as const,
-            backgroundColor: 'rgba(15, 15, 25, 0.9)',
+            backgroundColor: 'rgba(15, 15, 25, 0.95)',
             borderColor: '#333',
             textStyle: { color: '#e5e7eb', fontSize: 12 },
             formatter(params: any) {
-              const p = Array.isArray(params) ? params[0] : params;
-              const val = p.value != null ? p.value.toFixed(4) : '—';
-              return '<b>' + p.name + '</b><br/>1 ' + currency + ' = <b>' + val + '</b> TWD';
+              const items = Array.isArray(params) ? params : [params];
+              let html = '<b>' + items[0].name + '</b>';
+              for (const p of items) {
+                const val = p.value != null ? Number(p.value).toFixed(4) : '—';
+                const dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + p.color + ';margin-right:6px;"></span>';
+                html += '<br/>' + dot + p.seriesName + ': <b>' + val + '</b>';
+              }
+              html += '<br/><span style="color:#6b7280">1 ' + currency + ' → TWD</span>';
+              return html;
             },
           },
           xAxis: {
@@ -163,21 +245,7 @@ const ratesJson = JSON.stringify(ratesData);
             axisLabel: { color: '#6b7280', fontSize: 11 },
           },
           dataZoom: [{ type: 'inside' as const, start: 0, end: 100 }],
-          series: [{
-            type: 'line' as const,
-            data,
-            smooth: true,
-            symbol: 'circle',
-            symbolSize: 6,
-            lineStyle: { color: '#6366f1', width: 2 },
-            itemStyle: { color: '#6366f1' },
-            areaStyle: {
-              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: 'rgba(99, 102, 241, 0.3)' },
-                { offset: 1, color: 'rgba(99, 102, 241, 0.02)' },
-              ]),
-            },
-          }],
+          series: seriesList,
         };
       }
 
@@ -200,7 +268,9 @@ const ratesJson = JSON.stringify(ratesData);
         chart.setOption(buildOption(currency), true);
       }
 
-      function setActive(currency: string) {
+      function setActiveCurrency(currency: string) {
+        activeCurrency = currency;
+
         document.querySelectorAll('.currency-card').forEach((el) => {
           const c = (el as HTMLElement).dataset.currency;
           if (c === currency) {
@@ -220,16 +290,72 @@ const ratesJson = JSON.stringify(ratesData);
         renderChart(currency);
       }
 
+      function setActiveSource(source: string) {
+        activeSource = source;
+
+        // Update tab styles
+        document.querySelectorAll('.source-tab').forEach((el) => {
+          const s = (el as HTMLElement).dataset.source;
+          if (s === source) {
+            el.classList.add('bg-indigo-500/20', 'text-indigo-400', 'border-indigo-500/50');
+            el.classList.remove('text-gray-400', 'border-gray-700');
+          } else {
+            el.classList.remove('bg-indigo-500/20', 'text-indigo-400', 'border-indigo-500/50');
+            el.classList.add('text-gray-400', 'border-gray-700');
+          }
+        });
+
+        // Toggle card rows visibility
+        document.querySelectorAll('.source-row').forEach((el) => {
+          const rowSrc = (el as HTMLElement).dataset.rowSource;
+          if (source === 'all' || rowSrc === source) {
+            (el as HTMLElement).style.display = '';
+          } else {
+            (el as HTMLElement).style.display = 'none';
+          }
+        });
+
+        // Toggle rate value colors: show comparison colors only in "all" mode
+        document.querySelectorAll('.rate-value').forEach((el) => {
+          const htmlEl = el as HTMLElement;
+          if (source === 'all') {
+            // Restore original classes (stored via data attr on first run)
+            const orig = htmlEl.dataset.origClass;
+            if (orig) htmlEl.className = orig;
+          } else {
+            // Store original and reset to neutral
+            if (!htmlEl.dataset.origClass) {
+              htmlEl.dataset.origClass = htmlEl.className;
+            }
+            htmlEl.className = htmlEl.className
+              .replace(/text-emerald-400/g, 'text-gray-100')
+              .replace(/text-red-400/g, 'text-gray-100');
+          }
+        });
+
+        renderChart(activeCurrency);
+      }
+
+      // Source tab clicks
+      document.querySelectorAll('.source-tab').forEach((el) => {
+        el.addEventListener('click', () => {
+          const source = (el as HTMLElement).dataset.source;
+          if (source) setActiveSource(source);
+        });
+      });
+
+      // Currency card clicks
       document.querySelectorAll('.currency-card').forEach((el) => {
         el.addEventListener('click', () => {
           const currency = (el as HTMLElement).dataset.currency;
-          if (currency) setActive(currency);
+          if (currency) setActiveCurrency(currency);
         });
       });
 
       window.addEventListener('resize', () => chart?.resize());
 
-      setActive('USD');
+      // Init
+      setActiveCurrency('USD');
     </script>
   </body>
 </html>
