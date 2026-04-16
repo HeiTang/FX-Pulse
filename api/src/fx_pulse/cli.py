@@ -5,9 +5,10 @@ from __future__ import annotations
 import logging
 import sys
 from datetime import UTC, datetime
+from typing import Any
 
 from .models.rate import CurrencyRate
-from .scraper.base import BaseScraper
+from .scraper.jcb import JcbScraper
 from .scraper.mastercard import MastercardScraper
 from .scraper.visa import VisaScraper
 from .store import get_store
@@ -30,7 +31,7 @@ def main() -> None:
     now = datetime.now(UTC)
     date_key = now.strftime("%Y-%m-%d")
 
-    scrapers: list[BaseScraper] = [VisaScraper(), MastercardScraper()]
+    scrapers: list[Any] = [VisaScraper(), MastercardScraper(), JcbScraper()]
     store = get_store()
 
     for scraper in scrapers:
