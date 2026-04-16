@@ -88,6 +88,50 @@ class JcbScraper:
         )
         return result
 
+    def fetch_month(
+        self,
+        year: int,
+        month: int,
+        days: list[int],
+        currencies: list[str] | None = None,
+    ) -> dict[int, dict[str, dict[str, float]]]:
+        """Download one PDF and parse multiple days at once.
+
+        Returns: {1: {"USD": {"rate": ..., "reverse": ...}}, 2: {...}, ...}
+        Only returns days/currencies that have data.
+        """
+        if currencies is None:
+            currencies = settings.currencies
+
+        logger.info(
+            "[%s] Batch fetch | target=%04d-%02d | days=%s",
+            self.source_name,
+            year,
+            month,
+            days,
+        )
+
+        pdf_url = self._find_pdf_url(year, month)
+        pdf_path = self._download_pdf(pdf_url)
+
+        try:
+            result = self._parse_pdf_multi(pdf_path, days)
+        finally:
+            pdf_path.unlink(missing_ok=True)
+
+        # Filter to tracked currencies
+        tracked = set(currencies)
+        filtered: dict[int, dict[str, dict[str, float]]] = {}
+        for day, day_rates in result.items():
+            filtered[day] = {k: v for k, v in day_rates.items() if k in tracked}
+
+        logger.info(
+            "[%s] Batch complete | %d days extracted",
+            self.source_name,
+            len(filtered),
+        )
+        return filtered
+
     # ── Internal ──────────────────────────────────────────────────────────────
 
     def _find_pdf_url(self, year: int, month: int) -> str:
@@ -145,6 +189,33 @@ class JcbScraper:
                         return result
 
         raise ValueError(f"[{self.source_name}] No rate data found for day {target_day}")
+
+    def _parse_pdf_multi(
+        self,
+        path: Path,
+        target_days: list[int],
+    ) -> dict[int, dict[str, dict[str, float]]]:
+        """Parse all pages, extract rates for multiple days."""
+        remaining = set(target_days)
+        result: dict[int, dict[str, dict[str, float]]] = {}
+
+        with pdfplumber.open(path) as pdf:
+            for page in pdf.pages:
+                tables = page.extract_tables()
+                for table in tables:
+                    for day in list(remaining):
+                        day_rates = self._extract_from_table(table, day)
+                        if day_rates is not None:
+                            result[day] = day_rates
+                            remaining.discard(day)
+
+        if remaining:
+            logger.warning(
+                "[%s] No data found for days: %s",
+                self.source_name,
+                sorted(remaining),
+            )
+        return result
 
     def _extract_from_table(
         self,
