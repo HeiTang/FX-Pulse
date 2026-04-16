@@ -23,7 +23,7 @@ pnpm-debug.log*
 .vscode/
 
 # Python
-__pycache__/
+**/__pycache__/
 *.py[cod]
 *.egg-info/
 **/.ruff_cache/
