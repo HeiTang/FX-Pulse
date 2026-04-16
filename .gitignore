@@ -26,9 +26,9 @@ pnpm-debug.log*
 __pycache__/
 *.py[cod]
 *.egg-info/
-.ruff_cache/
-.pytest_cache/
-.mypy_cache/
+**/.ruff_cache/
+**/.pytest_cache/
+**/.mypy_cache/
 
 # Virtual environments
 .venv/
