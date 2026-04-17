@@ -126,17 +126,15 @@ class TestMainCommand:
 
 class TestJcbFetchMonth:
     def test_extracts_multiple_days(self):
-        from tests.test_scraper_jcb import MOCK_TABLE_PAGE1, MOCK_TABLE_PAGE2
-
         scraper = JcbScraper()
-        # Test _parse_pdf_multi logic via _extract_from_table
-        result_day1 = scraper._extract_from_table(MOCK_TABLE_PAGE1, 1)
-        result_day2 = scraper._extract_from_table(MOCK_TABLE_PAGE1, 2)
-        result_day16 = scraper._extract_from_table(MOCK_TABLE_PAGE2, 16)
 
-        assert result_day1 is not None
-        assert result_day2 is not None
-        assert result_day16 is not None
-        assert result_day1["USD"]["rate"] == 31.968
-        assert result_day2["USD"]["rate"] == 32.032
-        assert result_day16["USD"]["rate"] == 31.617
+        def mock_fetch_all(date, currencies):
+            return {"JPY": {"rate": 0.199 + date.day * 0.001, "reverse": 5.0}}
+
+        with patch.object(scraper, "fetch_all", side_effect=mock_fetch_all):
+            result = scraper.fetch_month(2026, 4, [1, 2, 16], currencies=["JPY"])
+
+        assert set(result.keys()) == {1, 2, 16}
+        assert result[1]["JPY"]["rate"] == pytest.approx(0.200)
+        assert result[2]["JPY"]["rate"] == pytest.approx(0.201)
+        assert result[16]["JPY"]["rate"] == pytest.approx(0.215)

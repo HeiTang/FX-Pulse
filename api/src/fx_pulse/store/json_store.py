@@ -31,7 +31,7 @@ class JsonStore(BaseStore):
     def _save(self, payload: RatesPayload) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         with self._path.open("w") as f:
-            json.dump(payload.model_dump(), f, ensure_ascii=False, indent=2)
+            json.dump(payload.model_dump(), f, ensure_ascii=False, indent=2, sort_keys=True)
 
     # ── Interface ──────────────────────────────────────────────────────────────
 
