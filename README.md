@@ -19,13 +19,13 @@
 
 - **三來源同步比較**：同一幣別、同一天，三家匯率並排顯示，最優自動標綠、最差標紅。
 
-- **JCB PDF 解析**：JCB 無公開 API，直接下載官方月度 PDF 逐日解析，資料與官方完全一致。
+- **JCB Cross-Rate 解析**：JCB 無公開 API，從 jcb.jp 每日費率頁抓取 USD 基準匯率，以 `TWD/外幣 = (TWD/USD sell) / (外幣/USD buy)` 計算，支援全 8 幣別。
 
 - **Bot 防護繞過**：使用 curl-cffi Chrome TLS 指紋模擬，成功繞過 VISA Cloudflare 與 Mastercard Akamai 防護。
 
 - **互動走勢圖**：ECharts 三線對比圖，點擊幣別卡片即切換，支援滑動縮放。
 
-- **彈性 CLI**：可指定來源、日期、區間、月份，dry-run 驗證，JCB 整月批量解析優化（一份 PDF 解析全月）。
+- **彈性 CLI**：可指定來源、日期、區間、月份，dry-run 驗證，JCB 整月批量抓取優化（逐日平行請求）。
 
 - **零伺服器成本**：靜態網頁 × GitHub Pages，爬蟲排程 × GitHub Actions，全程無伺服器。
 
@@ -113,4 +113,4 @@ FX-Pulse/
 
 - 資料來源仰賴各信用卡發卡組織官網的匯率查詢，格式與可用性可能隨時變動。
 
-- JCB 幣別覆蓋較少（USD, JPY, EUR, HKD, KRW），缺少 GBP、AUD、SGD，前端顯示 `—`。
+- 本專案使用 jcb.jp 公開費率頁計算 JCB 匯率，非直接引用 JCB 台灣官方 API。
