@@ -6,8 +6,7 @@ import react from '@astrojs/react';
 
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://heitang.github.io',
-  base: '/FX-Pulse',
+  site: 'https://fx.purr.tw',
 
   vite: {
     plugins: [tailwindcss()]
