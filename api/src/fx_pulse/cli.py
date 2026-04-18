@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import calendar
+import json
 import logging
 import sys
 from collections import defaultdict
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import click
@@ -114,12 +116,17 @@ def _run_jcb_batch(
     *,
     dry_run: bool,
     store: Any,
-) -> None:
-    """Run JCB scraper with month-level PDF optimization."""
-    # Group dates by (year, month)
+) -> dict[str, Any]:
+    """Run JCB scraper with month-level batch optimization.
+
+    Returns a scraper result dict compatible with the --result-file format.
+    """
     by_month: dict[tuple[int, int], list[int]] = defaultdict(list)
     for d in dates:
         by_month[(d.year, d.month)].append(d.day)
+
+    currencies_fetched = 0
+    last_error: str | None = None
 
     for (year, month), days in sorted(by_month.items()):
         try:
@@ -127,17 +134,23 @@ def _run_jcb_batch(
             for day, raw in month_rates.items():
                 date_key = f"{year:04d}-{month:02d}-{day:02d}"
                 rates = {c: CurrencyRate(**v) for c, v in raw.items()}
+                currencies_fetched = max(currencies_fetched, len(raw))
                 if dry_run:
                     _print_rates(date_key, scraper.source_name, rates)
                 else:
                     store.upsert_rates(date_key, scraper.source_name, rates)
-        except Exception:
+        except Exception as exc:
+            last_error = str(exc)
             log.exception(
                 "Scraper %s failed for %04d-%02d",
                 scraper.source_name,
                 year,
                 month,
             )
+
+    if last_error and currencies_fetched == 0:
+        return {"status": "error", "currencies": 0, "error": last_error}
+    return {"status": "ok", "currencies": currencies_fetched}
 
 
 @click.command()
@@ -148,6 +161,7 @@ def _run_jcb_batch(
 @click.option("--to", "date_to", default=None, help="Range end (YYYY-MM-DD)")
 @click.option("--dry-run", is_flag=True, help="Print results without writing to store")
 @click.option("--delay", default=None, type=float, help="Fixed delay between requests (seconds)")
+@click.option("--result-file", default=None, help="Write scrape result summary to this JSON path")
 def main(
     source: str | None,
     target_date: str | None,
@@ -156,6 +170,7 @@ def main(
     date_to: str | None,
     dry_run: bool,
     delay: float | None,
+    result_file: str | None,
 ) -> None:
     """Fetch exchange rates from card network APIs."""
     _setup_logging()
@@ -181,24 +196,54 @@ def main(
         dry_run,
     )
 
+    scraper_results: dict[str, dict[str, Any]] = {}
+
     for scraper in scrapers:
         # JCB optimization: batch by month when fetching multiple days
         if isinstance(scraper, JcbScraper) and multi_day:
-            _run_jcb_batch(scraper, dates, dry_run=dry_run, store=store)
+            scraper_results[scraper.source_name] = _run_jcb_batch(
+                scraper, dates, dry_run=dry_run, store=store
+            )
             continue
+
+        currencies_fetched = 0
+        last_error: str | None = None
 
         for d in dates:
             date_key = d.strftime("%Y-%m-%d")
             try:
                 raw = scraper.fetch_all(d)
                 rates = {c: CurrencyRate(**v) for c, v in raw.items()}
+                currencies_fetched = max(currencies_fetched, len(raw))
                 if dry_run:
                     _print_rates(date_key, scraper.source_name, rates)
                 else:
                     store.upsert_rates(date_key, scraper.source_name, rates)
-            except Exception:
+            except Exception as exc:
+                last_error = str(exc)
                 log.exception(
                     "Scraper %s failed for %s — continuing",
                     scraper.source_name,
                     date_key,
                 )
+
+        if last_error and currencies_fetched == 0:
+            scraper_results[scraper.source_name] = {
+                "status": "error",
+                "currencies": 0,
+                "error": last_error,
+            }
+        else:
+            scraper_results[scraper.source_name] = {
+                "status": "ok",
+                "currencies": currencies_fetched,
+            }
+
+    if result_file:
+        overall = "ok" if all(r["status"] == "ok" for r in scraper_results.values()) else "error"
+        payload = {
+            "date": dates[-1].strftime("%Y-%m-%d"),
+            "status": overall,
+            "results": scraper_results,
+        }
+        Path(result_file).write_text(json.dumps(payload, indent=2))

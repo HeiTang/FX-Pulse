@@ -38,7 +38,36 @@ jobs:
         run: poetry install --only main
 
       - name: Fetch rates
-        run: poetry run fetch-rates
+        run: poetry run fetch-rates --result-file scrape_result.json
+
+      - name: Check scrape status
+        id: check-status
+        run: |
+          python -c "
+          import json, sys
+          r = json.load(open('scrape_result.json'))
+          has_failure = r['status'] != 'ok'
+          print('has_failure=' + str(has_failure).lower())
+          " >> $GITHUB_OUTPUT
+
+      - name: Notify Discord — daily rates
+        if: always()
+        run: |
+          poetry run python scripts/notify_discord.py \
+            --mode daily \
+            --webhook "${{ secrets.DISCORD_WEBHOOK_FX_DAILY }}" \
+            --result-file scrape_result.json
+        continue-on-error: true
+
+      - name: Notify Discord — alert on failure
+        if: steps.check-status.outputs.has_failure == 'true'
+        run: |
+          poetry run python scripts/notify_discord.py \
+            --mode alert \
+            --webhook "${{ secrets.DISCORD_WEBHOOK_FX_ALERTS }}" \
+            --result-file scrape_result.json \
+            --role-id "${{ secrets.DISCORD_ROLE_ID_ALERT }}"
+        continue-on-error: true
 
       - name: Commit updated rates.json
         run: |
