@@ -42,12 +42,17 @@ jobs:
 
       - name: Check scrape status
         id: check-status
+        if: always()
         run: |
           python -c "
-          import json, sys
-          r = json.load(open('scrape_result.json'))
-          has_failure = r['status'] != 'ok'
-          print('has_failure=' + str(has_failure).lower())
+          import json, os, sys
+          path = 'scrape_result.json'
+          if not os.path.exists(path):
+              print('has_failure=true')
+          else:
+              r = json.load(open(path))
+              has_failure = r['status'] != 'ok'
+              print('has_failure=' + str(has_failure).lower())
           " >> $GITHUB_OUTPUT
 
       - name: Notify Discord — daily rates
@@ -62,6 +67,22 @@ jobs:
       - name: Notify Discord — alert on failure
         if: steps.check-status.outputs.has_failure == 'true'
         run: |
+          if [ ! -f scrape_result.json ]; then
+            python -c "
+          import json
+          from datetime import date
+          payload = {
+              'date': date.today().isoformat(),
+              'status': 'error',
+              'results': {
+                  'VISA':       {'status': 'error', 'currencies': 0, 'error': 'process crashed before writing result file'},
+                  'Mastercard': {'status': 'error', 'currencies': 0, 'error': 'process crashed before writing result file'},
+                  'JCB':        {'status': 'error', 'currencies': 0, 'error': 'process crashed before writing result file'},
+              },
+          }
+          open('scrape_result.json', 'w').write(__import__('json').dumps(payload))
+          "
+          fi
           poetry run python scripts/notify_discord.py \
             --mode alert \
             --webhook "${{ secrets.DISCORD_WEBHOOK_FX_ALERTS }}" \
