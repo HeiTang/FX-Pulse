@@ -124,6 +124,96 @@ class TestMainCommand:
         assert "mutually exclusive" in result.output
 
 
+class TestResultFile:
+    @patch("fx_pulse.cli.get_store")
+    @patch("fx_pulse.cli._resolve_scrapers")
+    def test_result_file_written_on_success(self, mock_resolve, mock_store, tmp_path):
+        mock_scraper = MagicMock()
+        mock_scraper.source_name = "VISA"
+        mock_scraper.fetch_all.return_value = {"USD": {"rate": 31.5, "reverse": 0.0317}}
+        mock_resolve.return_value = [mock_scraper]
+
+        result_path = tmp_path / "result.json"
+        runner = CliRunner()
+        result = runner.invoke(
+            main, ["--source", "VISA", "--date", "2026-04-15", "--result-file", str(result_path)]
+        )
+        assert result.exit_code == 0, result.output
+        assert result_path.exists()
+
+        import json
+
+        data = json.loads(result_path.read_text())
+        assert data["status"] == "ok"
+        assert data["results"]["VISA"]["status"] == "ok"
+
+    @patch("fx_pulse.cli.get_store")
+    @patch("fx_pulse.cli._resolve_scrapers")
+    def test_result_file_status_error_on_scraper_failure(self, mock_resolve, mock_store, tmp_path):
+        mock_scraper = MagicMock()
+        mock_scraper.source_name = "VISA"
+        mock_scraper.fetch_all.side_effect = RuntimeError("network timeout")
+        mock_resolve.return_value = [mock_scraper]
+
+        result_path = tmp_path / "result.json"
+        runner = CliRunner()
+        result = runner.invoke(
+            main, ["--source", "VISA", "--date", "2026-04-15", "--result-file", str(result_path)]
+        )
+        assert result.exit_code == 0, result.output
+        assert result_path.exists()
+
+        import json
+
+        data = json.loads(result_path.read_text())
+        assert data["status"] == "error"
+        assert data["results"]["VISA"]["status"] == "error"
+        assert "network timeout" in data["results"]["VISA"]["error"]
+
+    @patch("fx_pulse.cli.get_store")
+    @patch("fx_pulse.cli._resolve_scrapers")
+    def test_partial_failure_reports_error(self, mock_resolve, mock_store, tmp_path):
+        """Scraper that succeeds on day 1 but fails on day 2 should report error."""
+        call_count = 0
+
+        mock_scraper = MagicMock()
+        mock_scraper.source_name = "VISA"
+
+        def fetch_side_effect(d):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 2:
+                raise RuntimeError("day 2 failed")
+            return {"USD": {"rate": 31.5, "reverse": 0.0317}}
+
+        mock_scraper.fetch_all.side_effect = fetch_side_effect
+        mock_resolve.return_value = [mock_scraper]
+
+        result_path = tmp_path / "result.json"
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "--source",
+                "VISA",
+                "--from",
+                "2026-04-14",
+                "--to",
+                "2026-04-15",
+                "--result-file",
+                str(result_path),
+            ],
+        )
+        assert result.exit_code == 0, result.output
+
+        import json
+
+        data = json.loads(result_path.read_text())
+        assert data["status"] == "error"
+        assert data["results"]["VISA"]["status"] == "error"
+        assert data["results"]["VISA"]["partial_success"] is True
+
+
 class TestJcbFetchMonth:
     def test_extracts_multiple_days(self):
         scraper = JcbScraper()

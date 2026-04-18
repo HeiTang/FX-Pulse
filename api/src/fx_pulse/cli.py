@@ -148,8 +148,13 @@ def _run_jcb_batch(
                 month,
             )
 
-    if last_error and currencies_fetched == 0:
-        return {"status": "error", "currencies": 0, "error": last_error}
+    if last_error:
+        return {
+            "status": "error",
+            "currencies": currencies_fetched,
+            "error": last_error,
+            "partial_success": currencies_fetched > 0,
+        }
     return {"status": "ok", "currencies": currencies_fetched}
 
 
@@ -227,11 +232,12 @@ def main(
                     date_key,
                 )
 
-        if last_error and currencies_fetched == 0:
+        if last_error:
             scraper_results[scraper.source_name] = {
                 "status": "error",
-                "currencies": 0,
+                "currencies": currencies_fetched,
                 "error": last_error,
+                "partial_success": currencies_fetched > 0,
             }
         else:
             scraper_results[scraper.source_name] = {
@@ -246,4 +252,12 @@ def main(
             "status": overall,
             "results": scraper_results,
         }
-        Path(result_file).write_text(json.dumps(payload, indent=2))
+        result_path = Path(result_file)
+        try:
+            result_path.parent.mkdir(parents=True, exist_ok=True)
+            result_path.write_text(json.dumps(payload, indent=2))
+        except OSError:
+            log.exception(
+                "Failed to write result summary file to %s; scraping completed",
+                result_path,
+            )

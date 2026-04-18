@@ -85,8 +85,8 @@ def _build_daily_payload(
         if not vals:
             continue
 
-        best_src = max(vals, key=lambda s: vals[s])
-        worst_src = min(vals, key=lambda s: vals[s]) if len(vals) > 1 else None
+        best_src = min(vals, key=lambda s: vals[s])
+        worst_src = max(vals, key=lambda s: vals[s]) if len(vals) > 1 else None
 
         lines = []
         for src in SOURCES:

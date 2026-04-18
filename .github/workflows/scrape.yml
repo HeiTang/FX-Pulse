@@ -44,16 +44,19 @@ jobs:
         id: check-status
         if: always()
         run: |
-          python -c "
-          import json, os, sys
+          python - <<'PY' >> $GITHUB_OUTPUT
+          import json, os
           path = 'scrape_result.json'
-          if not os.path.exists(path):
+          try:
+              if not os.path.exists(path):
+                  print('has_failure=true')
+              else:
+                  r = json.load(open(path))
+                  has_failure = r['status'] != 'ok'
+                  print('has_failure=' + str(has_failure).lower())
+          except Exception:
               print('has_failure=true')
-          else:
-              r = json.load(open(path))
-              has_failure = r['status'] != 'ok'
-              print('has_failure=' + str(has_failure).lower())
-          " >> $GITHUB_OUTPUT
+          PY
 
       - name: Notify Discord — daily rates
         if: always()
@@ -68,20 +71,21 @@ jobs:
         if: steps.check-status.outputs.has_failure == 'true'
         run: |
           if [ ! -f scrape_result.json ]; then
-            python -c "
-          import json
-          from datetime import date
-          payload = {
-              'date': date.today().isoformat(),
-              'status': 'error',
-              'results': {
-                  'VISA':       {'status': 'error', 'currencies': 0, 'error': 'process crashed before writing result file'},
-                  'Mastercard': {'status': 'error', 'currencies': 0, 'error': 'process crashed before writing result file'},
-                  'JCB':        {'status': 'error', 'currencies': 0, 'error': 'process crashed before writing result file'},
-              },
-          }
-          open('scrape_result.json', 'w').write(__import__('json').dumps(payload))
-          "
+            python - <<'PY'
+            import json
+            from datetime import date
+            msg = 'process crashed before writing result file'
+            payload = {
+                'date': date.today().isoformat(),
+                'status': 'error',
+                'results': {
+                    'VISA':       {'status': 'error', 'currencies': 0, 'error': msg},
+                    'Mastercard': {'status': 'error', 'currencies': 0, 'error': msg},
+                    'JCB':        {'status': 'error', 'currencies': 0, 'error': msg},
+                },
+            }
+            open('scrape_result.json', 'w').write(json.dumps(payload))
+            PY
           fi
           poetry run python scripts/notify_discord.py \
             --mode alert \

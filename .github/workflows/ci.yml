@@ -52,9 +52,10 @@ jobs:
           SHA="${{ github.sha }}"
           SHORT_SHA="${SHA:0:7}"
           REPO="${{ github.repository }}"
+          COMMIT_URL="https://github.com/$REPO/commit/$SHA"
           RUN_URL="https://github.com/$REPO/actions/runs/${{ github.run_id }}"
           curl -s -o /dev/null -w "%{http_code}" \
             -H "Content-Type: application/json" \
-            -d "{\"embeds\":[{\"title\":\"❌ FX Pulse CI 失敗\",\"description\":\"**Branch:** \`$BRANCH\`\\n**Commit:** [\`$SHORT_SHA\`]($RUN_URL)\",\"color\":15548997}]}" \
+            -d "{\"embeds\":[{\"title\":\"❌ FX Pulse CI 失敗\",\"description\":\"**Branch:** \`$BRANCH\`\\n**Commit:** [\`$SHORT_SHA\`]($COMMIT_URL)\\n**Run:** $RUN_URL\",\"color\":15548997}]}" \
             "${{ secrets.DISCORD_WEBHOOK_CI_CD }}"
         continue-on-error: true
