@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -59,9 +60,14 @@ def _send(webhook_url: str, payload: dict) -> None:
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        if resp.status not in (200, 204):
-            raise RuntimeError(f"Discord webhook returned {resp.status}")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            if resp.status not in (200, 204):
+                raise RuntimeError(f"Discord webhook returned {resp.status}")
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f"Discord webhook HTTP error: {exc.code}") from None
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Discord webhook connection error: {exc.reason}") from None
 
 
 # ── Embed builders ────────────────────────────────────────────────────────────
@@ -142,12 +148,18 @@ def _build_alert_payload(
             lines.append(f"✅ **{src}** — {res['currencies']} 幣別正常")
         else:
             error = res.get("error", "unknown error")
-            lines.append(f"❌ **{src}** — {error}")
+            sanitized = error.replace("@", "＠")
+            lines.append(f"❌ **{src}** — {sanitized}")
 
     content = f"<@&{role_id}>" if role_id else ""
 
+    allowed_mentions: dict = {"parse": []}
+    if role_id:
+        allowed_mentions = {"roles": [role_id]}
+
     return {
         "content": content,
+        "allowed_mentions": allowed_mentions,
         "embeds": [
             {
                 "title": f"🚨 FX Pulse 爬蟲失敗 · {date_key}",
