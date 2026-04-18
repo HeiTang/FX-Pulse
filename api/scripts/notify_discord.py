@@ -55,7 +55,7 @@ def _fmt_rate(rate: float) -> str:
 def _send(webhook_url: str, payload: dict) -> None:
     data = json.dumps(payload).encode()
     req = urllib.request.Request(
-        webhook_url,
+        webhook_url.strip(),
         data=data,
         headers={"Content-Type": "application/json"},
         method="POST",
@@ -65,7 +65,8 @@ def _send(webhook_url: str, payload: dict) -> None:
             if resp.status not in (200, 204):
                 raise RuntimeError(f"Discord webhook returned {resp.status}")
     except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"Discord webhook HTTP error: {exc.code}") from None
+        body = exc.read().decode(errors="replace")
+        raise RuntimeError(f"Discord webhook HTTP error: {exc.code} — {body}") from None
     except urllib.error.URLError as exc:
         raise RuntimeError(f"Discord webhook connection error: {exc.reason}") from None
 
