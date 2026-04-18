@@ -38,7 +38,61 @@ jobs:
         run: poetry install --only main
 
       - name: Fetch rates
-        run: poetry run fetch-rates
+        run: poetry run fetch-rates --result-file scrape_result.json
+
+      - name: Check scrape status
+        id: check-status
+        if: always()
+        run: |
+          python - <<'PY' >> $GITHUB_OUTPUT
+          import json, os
+          path = 'scrape_result.json'
+          try:
+              if not os.path.exists(path):
+                  print('has_failure=true')
+              else:
+                  r = json.load(open(path))
+                  has_failure = r['status'] != 'ok'
+                  print('has_failure=' + str(has_failure).lower())
+          except Exception:
+              print('has_failure=true')
+          PY
+
+      - name: Notify Discord — daily rates
+        if: always()
+        run: |
+          poetry run python scripts/notify_discord.py \
+            --mode daily \
+            --webhook "${{ secrets.DISCORD_WEBHOOK_FX_DAILY }}" \
+            --result-file scrape_result.json
+        continue-on-error: true
+
+      - name: Notify Discord — alert on failure
+        if: steps.check-status.outputs.has_failure == 'true'
+        run: |
+          if [ ! -f scrape_result.json ]; then
+            python - <<'PY'
+            import json
+            from datetime import date
+            msg = 'process crashed before writing result file'
+            payload = {
+                'date': date.today().isoformat(),
+                'status': 'error',
+                'results': {
+                    'VISA':       {'status': 'error', 'currencies': 0, 'error': msg},
+                    'Mastercard': {'status': 'error', 'currencies': 0, 'error': msg},
+                    'JCB':        {'status': 'error', 'currencies': 0, 'error': msg},
+                },
+            }
+            open('scrape_result.json', 'w').write(json.dumps(payload))
+            PY
+          fi
+          poetry run python scripts/notify_discord.py \
+            --mode alert \
+            --webhook "${{ secrets.DISCORD_WEBHOOK_FX_ALERTS }}" \
+            --result-file scrape_result.json \
+            --role-id "${{ secrets.DISCORD_ROLE_ID_ALERT }}"
+        continue-on-error: true
 
       - name: Commit updated rates.json
         run: |
