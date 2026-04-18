@@ -85,7 +85,7 @@ jobs:
                 },
             }
             open('scrape_result.json', 'w').write(json.dumps(payload))
-            PY
+          PY
           fi
           poetry run python scripts/notify_discord.py \
             --mode alert \

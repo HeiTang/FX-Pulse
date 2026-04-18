@@ -57,7 +57,10 @@ def _send(webhook_url: str, payload: dict) -> None:
     req = urllib.request.Request(
         webhook_url.strip(),
         data=data,
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "FXPulse-Bot/1.0 (https://github.com/0range/FX-Pulse)",
+        },
         method="POST",
     )
     try:
