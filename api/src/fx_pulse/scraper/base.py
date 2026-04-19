@@ -22,6 +22,27 @@ logger = logging.getLogger(__name__)
 _ua = UserAgent()
 
 
+class CloudflareBlockedError(RuntimeError):
+    """Raised when a Cloudflare challenge/block is detected."""
+
+
+def _check_cloudflare(resp: Any) -> None:
+    """Raise CloudflareBlockedError if the response looks like a CF block."""
+    if resp.status_code not in (403, 429, 503):
+        return
+    is_cf = (
+        "cf-ray" in resp.headers
+        or resp.headers.get("server", "").lower() == "cloudflare"
+        or "cloudflare" in resp.text.lower()
+        or "just a moment" in resp.text.lower()
+    )
+    if is_cf:
+        raise CloudflareBlockedError(
+            f"Cloudflare block: HTTP {resp.status_code} "
+            f"(cf-ray: {resp.headers.get('cf-ray', 'n/a')})"
+        )
+
+
 class BaseScraper(ABC):
     """Base class for FX rate scrapers."""
 
@@ -94,6 +115,7 @@ class BaseScraper(ABC):
                     resp.status_code,
                     len(resp.content),
                 )
+                _check_cloudflare(resp)
                 resp.raise_for_status()
 
                 data = resp.json()
@@ -109,6 +131,8 @@ class BaseScraper(ABC):
                 )
                 return result
 
+            except CloudflareBlockedError:
+                raise  # don't retry CF blocks
             except Exception as exc:
                 if attempt == max_retries - 1:
                     logger.error(

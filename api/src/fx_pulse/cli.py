@@ -14,6 +14,7 @@ from typing import Any
 import click
 
 from .models.rate import CurrencyRate
+from .scraper.base import CloudflareBlockedError
 from .scraper.jcb import JcbScraper
 from .scraper.mastercard import MastercardScraper
 from .scraper.visa import VisaScraper
@@ -139,6 +140,12 @@ def _run_jcb_batch(
                     _print_rates(date_key, scraper.source_name, rates)
                 else:
                     store.upsert_rates(date_key, scraper.source_name, rates)
+        except CloudflareBlockedError as exc:
+            return {
+                "status": "blocked",
+                "currencies": currencies_fetched,
+                "error": str(exc),
+            }
         except Exception as exc:
             last_error = str(exc)
             log.exception(
@@ -213,6 +220,7 @@ def main(
 
         currencies_fetched = 0
         last_error: str | None = None
+        cf_blocked = False
 
         for d in dates:
             date_key = d.strftime("%Y-%m-%d")
@@ -224,6 +232,15 @@ def main(
                     _print_rates(date_key, scraper.source_name, rates)
                 else:
                     store.upsert_rates(date_key, scraper.source_name, rates)
+            except CloudflareBlockedError as exc:
+                cf_blocked = True
+                last_error = str(exc)
+                log.error(
+                    "Scraper %s blocked by Cloudflare for %s",
+                    scraper.source_name,
+                    date_key,
+                )
+                break  # no point retrying other dates if CF is blocking
             except Exception as exc:
                 last_error = str(exc)
                 log.exception(
@@ -232,7 +249,13 @@ def main(
                     date_key,
                 )
 
-        if last_error:
+        if cf_blocked:
+            scraper_results[scraper.source_name] = {
+                "status": "blocked",
+                "currencies": currencies_fetched,
+                "error": last_error,
+            }
+        elif last_error:
             scraper_results[scraper.source_name] = {
                 "status": "error",
                 "currencies": currencies_fetched,
@@ -246,7 +269,13 @@ def main(
             }
 
     if result_file:
-        overall = "ok" if all(r["status"] == "ok" for r in scraper_results.values()) else "error"
+        statuses = {r["status"] for r in scraper_results.values()}
+        if statuses == {"ok"}:
+            overall = "ok"
+        elif "blocked" in statuses and not statuses & {"error"}:
+            overall = "blocked"
+        else:
+            overall = "error"
         payload = {
             "date": dates[-1].strftime("%Y-%m-%d"),
             "status": overall,

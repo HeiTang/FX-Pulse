@@ -16,6 +16,7 @@ from curl_cffi import requests as cf_requests
 from fake_useragent import UserAgent
 
 from ..config import settings
+from .base import CloudflareBlockedError, _check_cloudflare
 
 logger = logging.getLogger(__name__)
 _ua = UserAgent()
@@ -131,11 +132,12 @@ class JcbScraper:
                 if resp.status_code == 404:
                     raise ValueError(f"[{self.source_name}] No rates for {date.date()} (404)")
 
+                _check_cloudflare(resp)
                 resp.raise_for_status()
                 return self._parse_html(resp.text)
 
-            except ValueError:
-                raise  # 404 = no data, don't retry
+            except (ValueError, CloudflareBlockedError):
+                raise  # 404 / CF block — don't retry
             except Exception as exc:
                 if attempt == max_retries - 1:
                     raise RuntimeError(

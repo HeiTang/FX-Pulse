@@ -147,13 +147,28 @@ def _build_alert_payload(
 ) -> dict:
     """Build the failure alert embed for #fx-alerts."""
     lines = []
+    has_blocked = False
     for src, res in results.items():
-        if res["status"] == "ok":
+        status = res["status"]
+        if status == "ok":
             lines.append(f"✅ **{src}** — {res['currencies']} 幣別正常")
+        elif status == "blocked":
+            has_blocked = True
+            error = res.get("error", "unknown")
+            sanitized = error.replace("@", "＠")
+            lines.append(f"🛡️ **{src}** — Cloudflare 阻擋 · {sanitized}")
         else:
             error = res.get("error", "unknown error")
             sanitized = error.replace("@", "＠")
             lines.append(f"❌ **{src}** — {sanitized}")
+
+    all_blocked = all(r["status"] in ("ok", "blocked") for r in results.values())
+    color = COLOR_YELLOW if all_blocked else COLOR_RED
+    title = (
+        f"🛡️ FX Pulse 遭 Cloudflare 阻擋 · {date_key}"
+        if all_blocked and has_blocked
+        else f"🚨 FX Pulse 爬蟲失敗 · {date_key}"
+    )
 
     content = f"<@&{role_id}>" if role_id else ""
 
@@ -166,9 +181,9 @@ def _build_alert_payload(
         "allowed_mentions": allowed_mentions,
         "embeds": [
             {
-                "title": f"🚨 FX Pulse 爬蟲失敗 · {date_key}",
+                "title": title,
                 "description": "\n".join(lines),
-                "color": COLOR_RED,
+                "color": color,
             }
         ],
     }
