@@ -16,7 +16,7 @@ from curl_cffi import requests as cf_requests
 from fake_useragent import UserAgent
 
 from ..config import settings
-from .base import CloudflareBlockedError, _IMPERSONATE_TARGETS, _check_cloudflare
+from .base import _IMPERSONATE_TARGETS, CloudflareBlockedError, _check_cloudflare
 
 logger = logging.getLogger(__name__)
 _ua = UserAgent()
