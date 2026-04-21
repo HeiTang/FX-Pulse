@@ -290,3 +290,104 @@ def main(
                 "Failed to write result summary file to %s; scraping completed",
                 result_path,
             )
+
+
+@click.command()
+@click.option("--days", default=7, type=int, show_default=True, help="Look-back window in days")
+@click.option("--source", default=None, help="Comma-separated sources to check (default: all)")
+@click.option("--dry-run", is_flag=True, help="Print missing pairs without scraping")
+@click.option("--result-file", default=None, help="Write backfill result summary to this JSON path")
+def backfill(
+    days: int,
+    source: str | None,
+    dry_run: bool,
+    result_file: str | None,
+) -> None:
+    """Detect and fill missing (date, source) pairs from the last N days."""
+    _setup_logging()
+
+    scrapers = _resolve_scrapers(source)
+    source_names = [s.source_name for s in scrapers]
+    store = get_store()
+
+    missing = store.find_missing(source_names, days=days)
+
+    if not missing:
+        log.info("Backfill: nothing missing in the last %d days.", days)
+        if result_file:
+            Path(result_file).write_text(json.dumps({"status": "ok", "filled": 0}))
+        return
+
+    log.info("Backfill: %d missing (date, source) pairs found — %s", len(missing), missing)
+
+    if dry_run:
+        for date_key, src in missing:
+            click.echo(f"  MISSING  {date_key}  {src}")
+        return
+
+    # Group missing pairs by source so we can reuse the JCB batch optimisation
+    by_source: dict[str, list[str]] = defaultdict(list)
+    for date_key, src in missing:
+        by_source[src].append(date_key)
+
+    scraper_map = {s.source_name: s for s in scrapers}
+    scraper_results: dict[str, dict[str, Any]] = {}
+
+    for src, date_keys in by_source.items():
+        scraper = scraper_map[src]
+        dates_dt = [datetime.fromisoformat(dk).replace(tzinfo=UTC) for dk in sorted(date_keys)]
+
+        log.info("Backfill: scraping %s for %d date(s): %s", src, len(dates_dt), date_keys)
+
+        if isinstance(scraper, JcbScraper) and len(dates_dt) > 1:
+            scraper_results[src] = _run_jcb_batch(scraper, dates_dt, dry_run=False, store=store)
+        else:
+            currencies_fetched = 0
+            last_error: str | None = None
+            cf_blocked = False
+
+            for d in dates_dt:
+                date_key = d.strftime("%Y-%m-%d")
+                try:
+                    raw = scraper.fetch_all(d)
+                    rates = {c: CurrencyRate(**v) for c, v in raw.items()}
+                    currencies_fetched = max(currencies_fetched, len(raw))
+                    store.upsert_rates(date_key, scraper.source_name, rates)
+                except CloudflareBlockedError as exc:
+                    cf_blocked = True
+                    last_error = str(exc)
+                    log.error("Backfill: %s blocked by Cloudflare for %s", src, date_key)
+                    break
+                except Exception as exc:
+                    last_error = str(exc)
+                    log.exception("Backfill: %s failed for %s — continuing", src, date_key)
+
+            if cf_blocked:
+                scraper_results[src] = {
+                    "status": "blocked",
+                    "currencies": currencies_fetched,
+                    "error": last_error,
+                }
+            elif last_error:
+                scraper_results[src] = {
+                    "status": "error",
+                    "currencies": currencies_fetched,
+                    "error": last_error,
+                }
+            else:
+                scraper_results[src] = {"status": "ok", "currencies": currencies_fetched}
+
+    if result_file:
+        statuses = {r["status"] for r in scraper_results.values()}
+        if statuses <= {"ok"}:
+            overall = "ok"
+        elif "blocked" in statuses:
+            overall = "blocked"
+        else:
+            overall = "error"
+        Path(result_file).write_text(
+            json.dumps(
+                {"status": overall, "filled": len(missing), "results": scraper_results},
+                indent=2,
+            )
+        )
