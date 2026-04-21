@@ -402,7 +402,7 @@ def backfill(
         statuses = {r["status"] for r in scraper_results.values()}
         if statuses <= {"ok"}:
             overall = "ok"
-        elif "blocked" in statuses:
+        elif "blocked" in statuses and "error" not in statuses:
             overall = "blocked"
         else:
             overall = "error"
