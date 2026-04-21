@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from datetime import date, timedelta
+from datetime import UTC, datetime, timedelta
 
 from ..models.rate import CurrencyRate, HistoryPoint, RatesPayload
 
@@ -46,7 +46,7 @@ class BaseStore(ABC):
         JCB is skipped on weekends — jcb.jp does not publish Saturday/Sunday rates.
         Days are counted backwards from today (inclusive).
         """
-        today = date.today()
+        today = datetime.now(UTC).date()
         payload = self.export_payload()
         missing: list[tuple[str, str]] = []
 
