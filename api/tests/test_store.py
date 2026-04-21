@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import date
+from unittest.mock import patch
+
 from fx_pulse.models.rate import CurrencyRate
 from fx_pulse.store.json_store import JsonStore
 
@@ -104,3 +107,67 @@ class TestJsonStore:
 
         assert visa_rates["USD"].rate == 31.5
         assert mc_rates["USD"].rate == 31.6
+
+
+class TestFindMissing:
+    # 2026-04-21 = Tuesday, 2026-04-19 = Sunday, 2026-04-18 = Saturday
+
+    def _freeze_today(self, d: date):
+        """Patch fx_pulse.store.base.datetime so find_missing sees a fixed 'today'."""
+        mock = patch("fx_pulse.store.base.datetime")
+        patcher = mock.start()
+        patcher.now.return_value.date.return_value = d
+        return mock
+
+    def test_present_entry_not_reported(self, tmp_path):
+        store = JsonStore(path=tmp_path / "rates.json")
+        rates = {"USD": CurrencyRate(rate=31.5, reverse=0.031)}
+        store.upsert_rates("2026-04-21", "VISA", rates)
+
+        with patch("fx_pulse.store.base.datetime") as mock_dt:
+            mock_dt.now.return_value.date.return_value = date(2026, 4, 21)
+            missing = store.find_missing(["VISA"], days=1)
+
+        assert missing == []
+
+    def test_missing_source_reported(self, tmp_path):
+        store = JsonStore(path=tmp_path / "rates.json")
+        rates = {"USD": CurrencyRate(rate=31.5, reverse=0.031)}
+        store.upsert_rates("2026-04-21", "VISA", rates)
+
+        with patch("fx_pulse.store.base.datetime") as mock_dt:
+            mock_dt.now.return_value.date.return_value = date(2026, 4, 21)
+            missing = store.find_missing(["VISA", "Mastercard"], days=1)
+
+        assert ("2026-04-21", "Mastercard") in missing
+        assert ("2026-04-21", "VISA") not in missing
+
+    def test_jcb_weekend_skipped(self, tmp_path):
+        store = JsonStore(path=tmp_path / "rates.json")
+
+        with patch("fx_pulse.store.base.datetime") as mock_dt:
+            mock_dt.now.return_value.date.return_value = date(2026, 4, 19)  # Sunday
+            missing = store.find_missing(["JCB"], days=1)
+
+        assert missing == []
+
+    def test_jcb_weekday_reported_when_missing(self, tmp_path):
+        store = JsonStore(path=tmp_path / "rates.json")
+
+        with patch("fx_pulse.store.base.datetime") as mock_dt:
+            mock_dt.now.return_value.date.return_value = date(2026, 4, 21)  # Tuesday
+            missing = store.find_missing(["JCB"], days=1)
+
+        assert ("2026-04-21", "JCB") in missing
+
+    def test_rolling_window_covers_past_days(self, tmp_path):
+        store = JsonStore(path=tmp_path / "rates.json")
+        rates = {"USD": CurrencyRate(rate=31.5, reverse=0.031)}
+        store.upsert_rates("2026-04-21", "VISA", rates)
+
+        with patch("fx_pulse.store.base.datetime") as mock_dt:
+            mock_dt.now.return_value.date.return_value = date(2026, 4, 21)
+            missing = store.find_missing(["VISA"], days=2)
+
+        assert ("2026-04-20", "VISA") in missing
+        assert ("2026-04-21", "VISA") not in missing
