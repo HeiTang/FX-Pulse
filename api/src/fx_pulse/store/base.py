@@ -53,10 +53,10 @@ class BaseStore(ABC):
         for i in range(days):
             d = today - timedelta(days=i)
             date_key = d.isoformat()
+            existing = payload.rates.get(date_key, {})
             for source in sources:
                 if source.lower() == "jcb" and d.weekday() >= 5:  # Sat=5, Sun=6
                     continue
-                existing = payload.rates.get(date_key, {})
                 if not existing.get(source):
                     missing.append((date_key, source))
 
