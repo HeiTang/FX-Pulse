@@ -43,7 +43,7 @@ jobs:
         run: poetry run fetch-rates --result-file scrape_result.json
 
       - name: Backfill missing rates (last 7 days)
-        run: poetry run backfill-rates --days 7
+        run: poetry run backfill-rates --days 7 --result-file backfill_result.json
         continue-on-error: true
 
       - name: Check scrape status
