@@ -293,7 +293,13 @@ def main(
 
 
 @click.command()
-@click.option("--days", default=7, type=int, show_default=True, help="Look-back window in days")
+@click.option(
+    "--days",
+    default=7,
+    type=click.IntRange(min=1),
+    show_default=True,
+    help="Look-back window in days",
+)
 @click.option("--source", default=None, help="Comma-separated sources to check (default: all)")
 @click.option("--dry-run", is_flag=True, help="Print missing pairs without scraping")
 @click.option("--result-file", default=None, help="Write backfill result summary to this JSON path")
