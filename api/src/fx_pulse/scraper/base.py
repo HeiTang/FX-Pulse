@@ -21,6 +21,15 @@ from ..config import settings
 logger = logging.getLogger(__name__)
 _ua = UserAgent()
 
+# Rotate across engines/versions — CF bot detection is fingerprint-aware
+_IMPERSONATE_TARGETS = [
+    "chrome136",
+    "chrome133",
+    "safari18_0",
+    "firefox135",
+    "safari17_0",
+]
+
 
 class CloudflareBlockedError(RuntimeError):
     """Raised when a Cloudflare challenge/block is detected."""
@@ -56,7 +65,9 @@ class BaseScraper(ABC):
     @property
     def session(self) -> cf_requests.Session:
         if self._session is None:
-            self._session = cf_requests.Session(impersonate="chrome120")
+            target = random.choice(_IMPERSONATE_TARGETS)
+            logger.debug("[%s] impersonate=%s", self.source_name, target)
+            self._session = cf_requests.Session(impersonate=target)
             self._session.headers.update(
                 {
                     "accept": "application/json, text/plain, */*",

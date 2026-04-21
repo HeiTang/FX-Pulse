@@ -16,7 +16,7 @@ from curl_cffi import requests as cf_requests
 from fake_useragent import UserAgent
 
 from ..config import settings
-from .base import CloudflareBlockedError, _check_cloudflare
+from .base import CloudflareBlockedError, _IMPERSONATE_TARGETS, _check_cloudflare
 
 logger = logging.getLogger(__name__)
 _ua = UserAgent()
@@ -35,7 +35,9 @@ class JcbScraper:
     @property
     def session(self) -> cf_requests.Session:
         if self._session is None:
-            self._session = cf_requests.Session(impersonate="chrome120")
+            target = random.choice(_IMPERSONATE_TARGETS)
+            logger.debug("[%s] impersonate=%s", self.source_name, target)
+            self._session = cf_requests.Session(impersonate=target)
             self._session.headers.update(
                 {
                     "accept-language": "en-US,en;q=0.9",
