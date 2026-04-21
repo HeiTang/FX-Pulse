@@ -346,7 +346,14 @@ def backfill(
             try:
                 result_path.parent.mkdir(parents=True, exist_ok=True)
                 result_path.write_text(
-                    json.dumps({"status": "dry_run", "missing_found": len(missing)})
+                    json.dumps(
+                        {
+                            "status": "dry_run",
+                            "dry_run": True,
+                            "missing_found": len(missing),
+                            "results": {},
+                        }
+                    )
                 )
             except OSError:
                 log.exception("Failed to write result summary file to %s", result_path)
