@@ -112,13 +112,6 @@ class TestJsonStore:
 class TestFindMissing:
     # 2026-04-21 = Tuesday, 2026-04-19 = Sunday, 2026-04-18 = Saturday
 
-    def _freeze_today(self, d: date):
-        """Patch fx_pulse.store.base.datetime so find_missing sees a fixed 'today'."""
-        mock = patch("fx_pulse.store.base.datetime")
-        patcher = mock.start()
-        patcher.now.return_value.date.return_value = d
-        return mock
-
     def test_present_entry_not_reported(self, tmp_path):
         store = JsonStore(path=tmp_path / "rates.json")
         rates = {"USD": CurrencyRate(rate=31.5, reverse=0.031)}
