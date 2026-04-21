@@ -313,7 +313,13 @@ def backfill(
     _setup_logging()
 
     scrapers = _resolve_scrapers(source)
-    source_names = [s.source_name for s in scrapers]
+    # Deduplicate while preserving order (guards against --source visa,VISA)
+    seen: set[str] = set()
+    source_names: list[str] = []
+    for s in scrapers:
+        if s.source_name not in seen:
+            seen.add(s.source_name)
+            source_names.append(s.source_name)
     store = get_store()
 
     missing = store.find_missing(source_names, days=days)
@@ -329,7 +335,8 @@ def backfill(
                 log.exception("Failed to write result summary file to %s", result_path)
         return
 
-    log.info("Backfill: %d missing (date, source) pairs found — %s", len(missing), missing)
+    log.info("Backfill: %d missing (date, source) pairs found", len(missing))
+    log.debug("Backfill: missing pairs — %s", missing)
 
     if dry_run:
         for date_key, src in missing:
