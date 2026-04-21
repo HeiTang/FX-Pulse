@@ -1,0 +1,13 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <title>FX-Pulse (monochrome)</title>
+  <g fill="none" stroke-linecap="round">
+    <path d="M 10 50 C 23 24, 37 24, 50 50 S 77 76, 90 50"
+      stroke="currentColor" stroke-width="3.5"/>
+    <path d="M 10 50 C 23 32, 37 32, 50 50 S 77 68, 90 50"
+      stroke="currentColor" stroke-width="2.5" opacity="0.48"/>
+    <path d="M 10 50 C 23 40, 37 40, 50 50 S 77 60, 90 50"
+      stroke="currentColor" stroke-width="1.5" opacity="0.22"/>
+  </g>
+  <circle cx="10" cy="50" r="3.5" fill="currentColor"/>
+  <circle cx="90" cy="50" r="3.5" fill="currentColor"/>
+</svg>

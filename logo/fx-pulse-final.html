@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FX-Pulse — Brand Identity</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --blue: #4D9EFF;
+      --blue-50: rgba(77,158,255,0.5);
+      --blue-22: rgba(77,158,255,0.22);
+      --bg-dark: #0A1628;
+      --bg-darker: #060D1A;
+      --bg-light: #F5F7FA;
+      --text: #E8EEFA;
+      --text-dim: rgba(232,238,250,0.45);
+      --text-faint: rgba(232,238,250,0.2);
+      --border: rgba(77,158,255,0.12);
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      background: var(--bg-darker);
+      color: var(--text);
+    }
+
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    /* ── Hero ── */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-dark);
+      position: relative;
+      overflow: hidden;
+      padding: 60px 24px;
+    }
+
+    /* Subtle radial glow */
+    .hero::before {
+      content: '';
+      position: absolute;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(77,158,255,0.08) 0%, transparent 70%);
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+
+    .hero-logo {
+      width: 160px; height: 160px;
+      margin-bottom: 48px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-wordmark {
+      font-size: clamp(3rem, 8vw, 5.5rem);
+      font-weight: 200;
+      letter-spacing: 0.22em;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-wordmark span { color: var(--blue); }
+
+    .hero-tagline {
+      margin-top: 16px;
+      font-size: 0.7rem;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Section layout ── */
+    .section {
+      padding: 80px 40px;
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 40px;
+    }
+
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ── Scale grid ── */
+    .scale-grid {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      flex-wrap: wrap;
+    }
+
+    .scale-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .scale-canvas {
+      background: var(--bg-dark);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── Color swatches ── */
+    .swatch-row {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .swatch {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .swatch-block {
+      width: 120px;
+      height: 72px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    /* ── Usage contexts ── */
+    .context-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .context-card {
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    /* Navbar mockup */
+    .mock-nav {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .mock-nav-logo { width: 24px; height: 24px; flex-shrink: 0; }
+
+    .mock-nav-name {
+      font-size: 0.8rem;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+    }
+
+    .mock-links {
+      margin-left: auto;
+      display: flex;
+      gap: 18px;
+    }
+
+    .mock-link {
+      font-size: 0.65rem;
+      opacity: 0.38;
+    }
+
+    .mock-body {
+      padding: 20px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .mock-line {
+      height: 7px;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.07);
+    }
+
+    /* Favicon row */
+    .favicon-row {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .favicon-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    hr.rule {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 0 40px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Hero ── -->
+  <section class="hero">
+    <div class="hero-logo">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+        <g fill="none" stroke-linecap="round">
+          <path d="M 10 50 C 23 24, 37 24, 50 50 S 77 76, 90 50" stroke="#4D9EFF" stroke-width="3.5"/>
+          <path d="M 10 50 C 23 32, 37 32, 50 50 S 77 68, 90 50" stroke="#4D9EFF" stroke-width="2.5" opacity="0.5"/>
+          <path d="M 10 50 C 23 40, 37 40, 50 50 S 77 60, 90 50" stroke="#4D9EFF" stroke-width="1.5" opacity="0.22"/>
+        </g>
+        <circle cx="10" cy="50" r="3.5" fill="#4D9EFF"/>
+        <circle cx="90" cy="50" r="3.5" fill="#4D9EFF"/>
+      </svg>
+    </div>
+    <h1 class="hero-wordmark">FX<span>·</span>PULSE</h1>
+    <p class="hero-tagline">Real-time Foreign Exchange Monitor</p>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ── Scale ── -->
+  <div class="section">
+    <div class="section-title">
+      <span class="label">Scale</span>
+    </div>
+    <div class="scale-grid">
+      <!-- 128px -->
+      <div class="scale-item">
+        <div class="scale-canvas" style="width:128px;height:128px;padding:20px;">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+            <g fill="none" stroke-linecap="round">
+              <path d="M 10 50 C 23 24, 37 24, 50 50 S 77 76, 90 50" stroke="#4D9EFF" stroke-width="3.5"/>
+              <path d="M 10 50 C 23 32, 37 32, 50 50 S 77 68, 90 50" stroke="#4D9EFF" stroke-width="2.5" opacity="0.5"/>
+              <path d="M 10 50 C 23 40, 37 40, 50 50 S 77 60, 90 50" stroke="#4D9EFF" stroke-width="1.5" opacity="0.22"/>
+            </g>
+            <circle cx="10" cy="50" r="3.5" fill="#4D9EFF"/>
+            <circle cx="90" cy="50" r="3.5" fill="#4D9EFF"/>
+          </svg>
+        </div>
+        <span class="label">128px</span>
+      </div>
+      <!-- 64px -->
+      <div class="scale-item">
+        <div class="scale-canvas" style="width:64px;height:64px;padding:10px;">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+            <g fill="none" stroke-linecap="round">
+              <path d="M 10 50 C 23 24, 37 24, 50 50 S 77 76, 90 50" stroke="#4D9EFF" stroke-width="3.5"/>
+              <path d="M 10 50 C 23 32, 37 32, 50 50 S 77 68, 90 50" stroke="#4D9EFF" stroke-width="2.5" opacity="0.5"/>
+              <path d="M 10 50 C 23 40, 37 40, 50 50 S 77 60, 90 50" stroke="#4D9EFF" stroke-width="1.5" opacity="0.22"/>
+            </g>
+            <circle cx="10" cy="50" r="3.5" fill="#4D9EFF"/>
+            <circle cx="90" cy="50" r="3.5" fill="#4D9EFF"/>
+          </svg>
+        </div>
+        <span class="label">64px</span>
+      </div>
+      <!-- 32px -->
+      <div class="scale-item">
+        <div class="scale-canvas" style="width:32px;height:32px;padding:5px;">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+            <g fill="none" stroke-linecap="round">
+              <path d="M 10 50 C 23 24, 37 24, 50 50 S 77 76, 90 50" stroke="#4D9EFF" stroke-width="3.5"/>
+              <path d="M 10 50 C 23 32, 37 32, 50 50 S 77 68, 90 50" stroke="#4D9EFF" stroke-width="2.5" opacity="0.5"/>
+              <path d="M 10 50 C 23 40, 37 40, 50 50 S 77 60, 90 50" stroke="#4D9EFF" stroke-width="1.5" opacity="0.22"/>
+            </g>
+            <circle cx="10" cy="50" r="3.5" fill="#4D9EFF"/>
+            <circle cx="90" cy="50" r="3.5" fill="#4D9EFF"/>
+          </svg>
+        </div>
+        <span class="label">32px</span>
+      </div>
+      <!-- 16px favicon -->
+      <div class="scale-item">
+        <div class="scale-canvas" style="width:16px;height:16px;padding:2px;">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+            <g fill="none" stroke-linecap="round">
+              <path d="M 10 50 C 23 24, 37 24, 50 50 S 77 76, 90 50" stroke="#4D9EFF" stroke-width="3.5"/>
+              <path d="M 10 50 C 23 32, 37 32, 50 50 S 77 68, 90 50" stroke="#4D9EFF" stroke-width="2.5" opacity="0.5"/>
+              <path d="M 10 50 C 23 40, 37 40, 50 50 S 77 60, 90 50" stroke="#4D9EFF" stroke-width="1.5" opacity="0.22"/>
+            </g>
+            <circle cx="10" cy="50" r="3.5" fill="#4D9EFF"/>
+            <circle cx="90" cy="50" r="3.5" fill="#4D9EFF"/>
+          </svg>
+        </div>
+        <span class="label">16px</span>
+      </div>
+
+      <!-- Monochrome variants -->
+      <div style="margin-left:auto; display:flex; gap:12px; align-items:center;">
+        <div class="scale-item">
+          <div class="scale-canvas" style="width:72px;height:72px;padding:12px;background:#FFFFFF;color:#0D0D0D;">
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" style="color:#0D0D0D">
+              <g fill="none" stroke-linecap="round">
+                <path d="M 10 50 C 23 24, 37 24, 50 50 S 77 76, 90 50" stroke="currentColor" stroke-width="3.5"/>
+                <path d="M 10 50 C 23 32, 37 32, 50 50 S 77 68, 90 50" stroke="currentColor" stroke-width="2.5" opacity="0.48"/>
+                <path d="M 10 50 C 23 40, 37 40, 50 50 S 77 60, 90 50" stroke="currentColor" stroke-width="1.5" opacity="0.22"/>
+              </g>
+              <circle cx="10" cy="50" r="3.5" fill="currentColor"/>
+              <circle cx="90" cy="50" r="3.5" fill="currentColor"/>
+            </svg>
+          </div>
+          <span class="label">Light BG</span>
+        </div>
+        <div class="scale-item">
+          <div class="scale-canvas" style="width:72px;height:72px;padding:12px;background:#0E0E0E;">
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" style="color:#FFFFFF">
+              <g fill="none" stroke-linecap="round">
+                <path d="M 10 50 C 23 24, 37 24, 50 50 S 77 76, 90 50" stroke="currentColor" stroke-width="3.5"/>
+                <path d="M 10 50 C 23 32, 37 32, 50 50 S 77 68, 90 50" stroke="currentColor" stroke-width="2.5" opacity="0.48"/>
+                <path d="M 10 50 C 23 40, 37 40, 50 50 S 77 60, 90 50" stroke="currentColor" stroke-width="1.5" opacity="0.22"/>
+              </g>
+              <circle cx="10" cy="50" r="3.5" fill="currentColor"/>
+              <circle cx="90" cy="50" r="3.5" fill="currentColor"/>
+            </svg>
+          </div>
+          <span class="label">Dark BG</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="rule">
+
+  <!-- ── Color Tokens ── -->
+  <div class="section">
+    <div class="section-title">
+      <span class="label">Color Tokens</span>
+    </div>
+    <div class="swatch-row">
+      <div class="swatch">
+        <div class="swatch-block" style="background:#4D9EFF;"></div>
+        <div>
+          <p class="mono" style="font-size:0.65rem;color:var(--text);">#4D9EFF</p>
+          <p class="label" style="margin-top:4px;">Primary · Wave 1</p>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-block" style="background:rgba(77,158,255,0.5);"></div>
+        <div>
+          <p class="mono" style="font-size:0.65rem;color:var(--text);">#4D9EFF · 50%</p>
+          <p class="label" style="margin-top:4px;">Mid · Wave 2</p>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-block" style="background:rgba(77,158,255,0.22);"></div>
+        <div>
+          <p class="mono" style="font-size:0.65rem;color:var(--text);">#4D9EFF · 22%</p>
+          <p class="label" style="margin-top:4px;">Ghost · Wave 3</p>
+        </div>
+      </div>
+      <div class="swatch" style="margin-left:32px;">
+        <div class="swatch-block" style="background:#0A1628;"></div>
+        <div>
+          <p class="mono" style="font-size:0.65rem;color:var(--text);">#0A1628</p>
+          <p class="label" style="margin-top:4px;">Background · Primary</p>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-block" style="background:#060D1A;"></div>
+        <div>
+          <p class="mono" style="font-size:0.65rem;color:var(--text);">#060D1A</p>
+          <p class="label" style="margin-top:4px;">Background · Deep</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="rule">
+
+  <!-- ── Usage Contexts ── -->
+  <div class="section">
+    <div class="section-title">
+      <span class="label">Usage Contexts</span>
+    </div>
+    <div class="context-grid">
+
+      <!-- App navbar dark -->
+      <div class="context-card" style="background:#0A1628;">
+        <div class="mock-nav">
+          <div class="mock-nav-logo">
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+              <g fill="none" stroke-linecap="round">
+                <path d="M 10 50 C 23 24, 37 24, 50 50 S 77 76, 90 50" stroke="#4D9EFF" stroke-width="3.5"/>
+                <path d="M 10 50 C 23 32, 37 32, 50 50 S 77 68, 90 50" stroke="#4D9EFF" stroke-width="2.5" opacity="0.5"/>
+                <path d="M 10 50 C 23 40, 37 40, 50 50 S 77 60, 90 50" stroke="#4D9EFF" stroke-width="1.5" opacity="0.22"/>
+              </g>
+              <circle cx="10" cy="50" r="3.5" fill="#4D9EFF"/>
+              <circle cx="90" cy="50" r="3.5" fill="#4D9EFF"/>
+            </svg>
+          </div>
+          <span class="mock-nav-name" style="color:#E8EEFA;font-weight:400;letter-spacing:0.08em;">FX-Pulse</span>
+          <div class="mock-links">
+            <span class="mock-link" style="color:var(--text-dim);">Markets</span>
+            <span class="mock-link" style="color:var(--text-dim);">Alerts</span>
+            <span class="mock-link" style="color:var(--blue);opacity:1;">Dashboard</span>
+          </div>
+        </div>
+        <div class="mock-body">
+          <div class="mock-line" style="width:55%;background:rgba(77,158,255,0.08);"></div>
+          <div class="mock-line" style="width:38%;"></div>
+          <div class="mock-line" style="width:70%;"></div>
+        </div>
+        <p class="label" style="padding:12px 18px 16px;display:block;">App — Dark Navigation</p>
+      </div>
+
+      <!-- App navbar light -->
+      <div class="context-card" style="background:#F5F7FA;border-color:rgba(0,0,0,0.07);">
+        <div class="mock-nav" style="border-color:rgba(0,0,0,0.07);">
+          <div class="mock-nav-logo">
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+              <g fill="none" stroke-linecap="round">
+                <path d="M 10 50 C 23 24, 37 24, 50 50 S 77 76, 90 50" stroke="#2B7BE0" stroke-width="3.5"/>
+                <path d="M 10 50 C 23 32, 37 32, 50 50 S 77 68, 90 50" stroke="#2B7BE0" stroke-width="2.5" opacity="0.45"/>
+                <path d="M 10 50 C 23 40, 37 40, 50 50 S 77 60, 90 50" stroke="#2B7BE0" stroke-width="1.5" opacity="0.2"/>
+              </g>
+              <circle cx="10" cy="50" r="3.5" fill="#2B7BE0"/>
+              <circle cx="90" cy="50" r="3.5" fill="#2B7BE0"/>
+            </svg>
+          </div>
+          <span class="mock-nav-name" style="color:#1A1A1A;">FX-Pulse</span>
+          <div class="mock-links">
+            <span class="mock-link" style="color:#555;">Markets</span>
+            <span class="mock-link" style="color:#555;">Alerts</span>
+            <span class="mock-link" style="color:#2B7BE0;opacity:1;">Dashboard</span>
+          </div>
+        </div>
+        <div class="mock-body">
+          <div class="mock-line" style="width:55%;background:rgba(0,0,0,0.06);"></div>
+          <div class="mock-line" style="width:38%;background:rgba(0,0,0,0.06);"></div>
+          <div class="mock-line" style="width:70%;background:rgba(0,0,0,0.06);"></div>
+        </div>
+        <p class="label" style="padding:12px 18px 16px;display:block;color:#888;">App — Light Navigation</p>
+      </div>
+
+      <!-- Terminal / CLI style -->
+      <div class="context-card" style="background:#0B0F17;font-family:'JetBrains Mono',monospace;">
+        <div style="padding:16px 18px 12px;border-bottom:1px solid rgba(77,158,255,0.1);display:flex;align-items:center;gap:10px;">
+          <div style="width:20px;height:20px;">
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+              <g fill="none" stroke-linecap="round">
+                <path d="M 10 50 C 23 24, 37 24, 50 50 S 77 76, 90 50" stroke="#4D9EFF" stroke-width="3.5"/>
+                <path d="M 10 50 C 23 32, 37 32, 50 50 S 77 68, 90 50" stroke="#4D9EFF" stroke-width="2.5" opacity="0.5"/>
+                <path d="M 10 50 C 23 40, 37 40, 50 50 S 77 60, 90 50" stroke="#4D9EFF" stroke-width="1.5" opacity="0.22"/>
+              </g>
+              <circle cx="10" cy="50" r="3.5" fill="#4D9EFF"/>
+              <circle cx="90" cy="50" r="3.5" fill="#4D9EFF"/>
+            </svg>
+          </div>
+          <span style="font-size:0.7rem;color:#4D9EFF;letter-spacing:0.1em;">fx-pulse</span>
+          <span style="font-size:0.6rem;color:rgba(77,158,255,0.35);margin-left:auto;">v1.0.0</span>
+        </div>
+        <div style="padding:14px 18px;display:flex;flex-direction:column;gap:6px;">
+          <p style="font-size:0.62rem;color:rgba(77,158,255,0.4);">$ fx-pulse watch USD/JPY</p>
+          <p style="font-size:0.62rem;color:rgba(232,238,250,0.55);">→ Monitoring 1 pair</p>
+          <p style="font-size:0.62rem;color:rgba(232,238,250,0.3);">  USD/JPY  149.823 ▲ 0.12%</p>
+        </div>
+        <p class="label" style="padding:10px 18px 16px;display:block;">CLI — Terminal</p>
+      </div>
+
+    </div>
+  </div>
+
+  <hr class="rule">
+
+  <!-- ── Files ── -->
+  <div class="section" style="padding-bottom:100px;">
+    <div class="section-title">
+      <span class="label">Exported Files</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div style="display:flex;align-items:center;gap:16px;padding:14px 18px;background:rgba(77,158,255,0.04);border:1px solid var(--border);border-radius:10px;">
+        <span class="mono" style="font-size:0.65rem;color:var(--blue);">SVG</span>
+        <span style="font-size:0.8rem;opacity:0.8;">logo/fx-pulse.svg</span>
+        <span style="font-size:0.65rem;opacity:0.35;margin-left:auto;">ARCTIC · #4D9EFF · colour</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;padding:14px 18px;background:rgba(77,158,255,0.04);border:1px solid var(--border);border-radius:10px;">
+        <span class="mono" style="font-size:0.65rem;color:var(--blue);">SVG</span>
+        <span style="font-size:0.8rem;opacity:0.8;">logo/fx-pulse-mono.svg</span>
+        <span style="font-size:0.65rem;opacity:0.35;margin-left:auto;">Monochrome · currentColor</span>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
