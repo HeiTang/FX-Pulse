@@ -355,9 +355,10 @@ def backfill(
 
     for src, date_keys in by_source.items():
         scraper = scraper_map[src]
-        dates_dt = [datetime.fromisoformat(dk).replace(tzinfo=UTC) for dk in sorted(date_keys)]
+        sorted_date_keys = sorted(date_keys)
+        dates_dt = [datetime.fromisoformat(dk).replace(tzinfo=UTC) for dk in sorted_date_keys]
 
-        log.info("Backfill: scraping %s for %d date(s): %s", src, len(dates_dt), date_keys)
+        log.info("Backfill: scraping %s for %d date(s): %s", src, len(dates_dt), sorted_date_keys)
 
         if isinstance(scraper, JcbScraper) and len(dates_dt) > 1:
             scraper_results[src] = _run_jcb_batch(scraper, dates_dt, dry_run=False, store=store)
