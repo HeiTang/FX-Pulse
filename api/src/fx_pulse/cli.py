@@ -334,6 +334,15 @@ def backfill(
     if dry_run:
         for date_key, src in missing:
             click.echo(f"  MISSING  {date_key}  {src}")
+        if result_file:
+            result_path = Path(result_file)
+            try:
+                result_path.parent.mkdir(parents=True, exist_ok=True)
+                result_path.write_text(
+                    json.dumps({"status": "dry_run", "missing_found": len(missing)})
+                )
+            except OSError:
+                log.exception("Failed to write result summary file to %s", result_path)
         return
 
     # Group missing pairs by source so we can reuse the JCB batch optimisation
