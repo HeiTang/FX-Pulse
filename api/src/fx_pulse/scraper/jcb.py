@@ -154,7 +154,8 @@ class JcbScraper:
                     exc,
                     delay,
                 )
-                self.session.headers["user-agent"] = _ua.random
+                # Reset session so next attempt picks a fresh impersonate target
+                self._session = None
                 time.sleep(delay)
 
         raise RuntimeError("Unreachable")

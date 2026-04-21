@@ -21,13 +21,14 @@ from ..config import settings
 logger = logging.getLogger(__name__)
 _ua = UserAgent()
 
-# Rotate across engines/versions — CF bot detection is fingerprint-aware
+# Rotate across engines/versions — CF bot detection is fingerprint-aware.
+# Only targets confirmed available in curl_cffi >= 0.7; chrome133 removed (unsupported).
 _IMPERSONATE_TARGETS = [
     "chrome136",
-    "chrome133",
     "safari18_0",
     "firefox135",
     "safari17_0",
+    "chrome124",
 ]
 
 
@@ -169,7 +170,8 @@ class BaseScraper(ABC):
                     exc,
                     sleep,
                 )
-                self.session.headers["user-agent"] = _ua.random
+                # Reset session so next attempt picks a fresh impersonate target
+                self._session = None
                 time.sleep(sleep)
 
         raise RuntimeError("Unreachable")
