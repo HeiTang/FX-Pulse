@@ -2,8 +2,10 @@ name: Daily FX Scrape
 
 on:
   schedule:
-    # UTC 00:00 = Taiwan 08:00 — VISA updates rates daily around midnight UTC
-    - cron: "0 0 * * *"
+    # UTC 03:00 = JST 12:00 / Taiwan 11:00
+    # - VISA: API available at midnight UTC; still accessible at 03:00
+    # - JCB:  jcb.jp daily HTML page published ~JST 10:30; 12:00 gives safe margin
+    - cron: "0 3 * * *"
   workflow_dispatch: # manual trigger
 
 permissions:
