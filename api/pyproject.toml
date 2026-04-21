@@ -20,6 +20,7 @@ packages = [{include = "fx_pulse", from = "src"}]
 
 [project.scripts]
 fetch-rates = "fx_pulse.cli:main"
+backfill-rates = "fx_pulse.cli:backfill"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
