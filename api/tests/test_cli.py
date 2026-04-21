@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from click.testing import CliRunner
 
-from fx_pulse.cli import _resolve_dates, _resolve_scrapers, main
+from fx_pulse.cli import _resolve_dates, _resolve_scrapers, backfill, main
 from fx_pulse.scraper.jcb import JcbScraper
 from fx_pulse.scraper.mastercard import MastercardScraper
 from fx_pulse.scraper.visa import VisaScraper
@@ -212,6 +212,59 @@ class TestResultFile:
         assert data["status"] == "error"
         assert data["results"]["VISA"]["status"] == "error"
         assert data["results"]["VISA"]["partial_success"] is True
+
+
+class TestBackfillCommand:
+    @patch("fx_pulse.cli.get_store")
+    @patch("fx_pulse.cli._resolve_scrapers")
+    def test_nothing_missing_exits_ok(self, mock_resolve, mock_store):
+        mock_scraper = MagicMock()
+        mock_scraper.source_name = "VISA"
+        mock_resolve.return_value = [mock_scraper]
+        mock_store.return_value.find_missing.return_value = []
+
+        runner = CliRunner()
+        result = runner.invoke(backfill, ["--days", "7"])
+        assert result.exit_code == 0
+        mock_scraper.fetch_all.assert_not_called()
+
+    @patch("fx_pulse.cli.get_store")
+    @patch("fx_pulse.cli._resolve_scrapers")
+    def test_dry_run_prints_missing_without_scraping(self, mock_resolve, mock_store):
+        mock_scraper = MagicMock()
+        mock_scraper.source_name = "VISA"
+        mock_resolve.return_value = [mock_scraper]
+        mock_store.return_value.find_missing.return_value = [
+            ("2026-04-20", "VISA"),
+            ("2026-04-19", "VISA"),
+        ]
+
+        runner = CliRunner()
+        result = runner.invoke(backfill, ["--dry-run"])
+        assert result.exit_code == 0
+        assert "2026-04-20" in result.output
+        assert "2026-04-19" in result.output
+        mock_scraper.fetch_all.assert_not_called()
+
+    @patch("fx_pulse.cli.get_store")
+    @patch("fx_pulse.cli._resolve_scrapers")
+    def test_scrapes_only_missing_pairs(self, mock_resolve, mock_store):
+        mock_scraper = MagicMock()
+        mock_scraper.source_name = "VISA"
+        mock_scraper.fetch_all.return_value = {"USD": {"rate": 31.5, "reverse": 0.031}}
+        mock_resolve.return_value = [mock_scraper]
+        mock_store.return_value.find_missing.return_value = [("2026-04-20", "VISA")]
+
+        runner = CliRunner()
+        result = runner.invoke(backfill, ["--days", "7"])
+        assert result.exit_code == 0
+        mock_scraper.fetch_all.assert_called_once()
+        mock_store.return_value.upsert_rates.assert_called_once()
+
+    def test_invalid_days_rejected(self):
+        runner = CliRunner()
+        result = runner.invoke(backfill, ["--days", "0"])
+        assert result.exit_code != 0
 
 
 class TestJcbFetchMonth:
