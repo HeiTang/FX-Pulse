@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 
@@ -71,7 +71,8 @@ class TestFetchOneRetry:
     def _make_scraper_with_mock_session(self) -> tuple[VisaScraper, MagicMock]:
         scraper = VisaScraper()
         mock_session = MagicMock()
-        scraper._session = mock_session  # bypass property, inject directly
+        # Patch the property so _session = None resets don't break the mock
+        type(scraper).session = PropertyMock(return_value=mock_session)
         return scraper, mock_session
 
     def test_fetch_one_retries_on_failure(self):
