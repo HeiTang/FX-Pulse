@@ -315,7 +315,12 @@ def backfill(
     if not missing:
         log.info("Backfill: nothing missing in the last %d days.", days)
         if result_file:
-            Path(result_file).write_text(json.dumps({"status": "ok", "filled": 0}))
+            result_path = Path(result_file)
+            try:
+                result_path.parent.mkdir(parents=True, exist_ok=True)
+                result_path.write_text(json.dumps({"status": "ok", "missing_found": 0}))
+            except OSError:
+                log.exception("Failed to write result summary file to %s", result_path)
         return
 
     log.info("Backfill: %d missing (date, source) pairs found — %s", len(missing), missing)
@@ -373,6 +378,7 @@ def backfill(
                     "status": "error",
                     "currencies": currencies_fetched,
                     "error": last_error,
+                    "partial_success": currencies_fetched > 0,
                 }
             else:
                 scraper_results[src] = {"status": "ok", "currencies": currencies_fetched}
@@ -385,9 +391,16 @@ def backfill(
             overall = "blocked"
         else:
             overall = "error"
-        Path(result_file).write_text(
-            json.dumps(
-                {"status": overall, "filled": len(missing), "results": scraper_results},
-                indent=2,
+        result_path = Path(result_file)
+        try:
+            result_path.parent.mkdir(parents=True, exist_ok=True)
+            result_path.write_text(
+                json.dumps(
+                    {"status": overall, "missing_found": len(missing), "results": scraper_results},
+                    indent=2,
+                )
             )
-        )
+        except OSError:
+            log.exception(
+                "Failed to write result summary file to %s; backfill completed", result_path
+            )
