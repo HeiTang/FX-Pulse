@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - "web/**"
+  workflow_run:
+    workflows: ["Daily FX Scrape"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
