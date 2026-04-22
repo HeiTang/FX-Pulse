@@ -25,6 +25,8 @@
 
 - **互動走勢圖**：ECharts 三線對比圖，點擊幣別卡片即切換，支援滑動縮放。
 
+- **自動回補缺漏**：每日抓取後自動掃描近 7 天缺漏的 `(日期, 來源)` pair，JCB 週末自動跳過，確保歷史資料完整。
+
 - **彈性 CLI**：可指定來源、日期、區間、月份，dry-run 驗證，JCB 整月批量抓取優化（逐日平行請求）。
 
 - **零伺服器成本**：靜態網頁 × GitHub Pages，爬蟲排程 × GitHub Actions，全程無伺服器。
@@ -49,7 +51,12 @@ npm run dev                   # localhost:4321
 
 ## 🛠 CLI 用法
 
+### `fetch-rates` — 抓取匯率
+
 ```bash
+# 抓今日全部來源
+poetry run fetch-rates
+
 # 指定來源（逗號分隔，大小寫不限）
 poetry run fetch-rates --source VISA,JCB
 
@@ -67,6 +74,22 @@ poetry run fetch-rates --source JCB --date 2026-04-15 --dry-run
 
 # 控制請求間隔（秒）
 poetry run fetch-rates --month 2026-04 --delay 2.0
+```
+
+### `backfill-rates` — 補回缺漏資料
+
+```bash
+# 掃描並補回近 7 天缺漏（預設）
+poetry run backfill-rates
+
+# 指定回溯天數
+poetry run backfill-rates --days 14
+
+# 只補特定來源
+poetry run backfill-rates --source VISA,Mastercard
+
+# Dry run（只印出缺漏，不抓資料）
+poetry run backfill-rates --dry-run
 ```
 
 ## ⚙️ 環境變數
@@ -96,10 +119,10 @@ poetry run ruff check src/ tests/
 FX-Pulse/
 ├── api/                        # Python 後端（Poetry）
 │   ├── src/fx_pulse/
-│   │   ├── cli.py              # fetch-rates CLI（click）
+│   │   ├── cli.py              # fetch-rates / backfill-rates CLI（click）
 │   │   ├── config.py           # pydantic-settings 集中管理
 │   │   ├── scraper/            # VisaScraper / MastercardScraper / JcbScraper
-│   │   └── store/              # JsonStore（Repository Pattern）
+│   │   └── store/              # JsonStore + find_missing（Repository Pattern）
 │   └── tests/
 └── web/                        # Astro 前端
     └── src/
