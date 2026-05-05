@@ -143,13 +143,16 @@ const ratesJson = JSON.stringify(ratesData);
           <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wider">走勢圖表</h2>
           <div id="active-currency" class="text-sm font-medium text-indigo-400"></div>
         </div>
-        <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-          <div id="chart" class="w-full" style="height: 400px;"></div>
-          <div id="chart-placeholder" class="hidden w-full flex items-center justify-center text-gray-500 text-sm" style="height: 400px;">
-            資料累積中，需至少 2 天數據才能繪製走勢圖
+          <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+            <div id="chart" class="w-full" style="height: 400px;"></div>
+            <div id="chart-placeholder" class="hidden w-full flex items-center justify-center text-gray-500 text-sm" style="height: 400px;">
+              資料累積中，需至少 2 天數據才能繪製走勢圖
+            </div>
+            <p class="mt-3 text-xs text-gray-500">
+              * 部分來源於假日可能無資料，曲線為跨缺值連線顯示。
+            </p>
           </div>
-        </div>
-      </section>
+        </section>
 
       <!-- Footer -->
       <footer class="text-center text-xs text-gray-600 pb-8">
@@ -218,6 +221,7 @@ const ratesJson = JSON.stringify(ratesData);
             type: 'line' as const,
             data: getSeriesData(currency, src),
             smooth: true,
+            connectNulls: true,
             symbol: 'circle',
             symbolSize: 5,
             lineStyle: { color: colors.line, width: 2 },
@@ -249,6 +253,7 @@ const ratesJson = JSON.stringify(ratesData);
             textStyle: { color: '#e5e7eb', fontSize: 12 },
             formatter(params: any) {
               const items = Array.isArray(params) ? params : [params];
+              const hasMissing = items.some((p: any) => p.value == null);
               let html = '<b>' + items[0].name + '</b>';
               for (const p of items) {
                 const val = p.value != null ? Number(p.value).toFixed(4) : '—';
@@ -256,6 +261,9 @@ const ratesJson = JSON.stringify(ratesData);
                 html += '<br/>' + dot + p.seriesName + ': <b>' + val + '</b>';
               }
               html += '<br/><span style="color:#6b7280">1 ' + currency + ' → TWD</span>';
+              if (hasMissing) {
+                html += '<br/><span style="color:#6b7280">假日無匯率</span>';
+              }
               return html;
             },
           },
