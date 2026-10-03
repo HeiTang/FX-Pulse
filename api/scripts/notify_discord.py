@@ -59,7 +59,7 @@ def _send(webhook_url: str, payload: dict) -> None:
         data=data,
         headers={
             "Content-Type": "application/json",
-            "User-Agent": "FXPulse-Bot/1.0 (https://github.com/0range/FX-Pulse)",
+            "User-Agent": "FXPulse-Bot/1.0 (https://github.com/HeiTang/FX-Pulse)",
         },
         method="POST",
     )
@@ -112,13 +112,15 @@ def _build_daily_payload(
                 marker = ""
             lines.append(f"`{src:<12}` {rate_str}{marker}")
 
-        fields.append({
-            "name": CURRENCY_LABEL[currency],
-            "value": "\n".join(lines),
-            "inline": True,
-        })
+        fields.append(
+            {
+                "name": CURRENCY_LABEL[currency],
+                "value": "\n".join(lines),
+                "inline": True,
+            }
+        )
 
-    failed = [s for s, r in results.items() if r["status"] == "error"]
+    failed = [s for s, r in results.items() if r["status"] != "ok"]
     color = COLOR_GREEN if not failed else COLOR_YELLOW
 
     status_parts = []
@@ -132,6 +134,7 @@ def _build_daily_payload(
         "embeds": [
             {
                 "title": f"📊 FX Pulse 每日匯率 · {date_key}",
+                "description": "1 外幣 = TWD；未計銀行費用／回饋。JCB 為交叉匯率估算。",
                 "color": color,
                 "fields": fields,
                 "footer": {"text": "  ·  ".join(status_parts)},

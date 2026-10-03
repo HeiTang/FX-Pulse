@@ -14,7 +14,7 @@ SourceRates = dict[str, CurrencyRate]
 class BaseStore(ABC):
     """Storage backend interface.
 
-    Implementations: JsonStore (file), TursoStore (libSQL), D1Store (Cloudflare).
+    Current implementation: JsonStore (file).
     """
 
     @abstractmethod
@@ -32,7 +32,7 @@ class BaseStore(ABC):
 
     @abstractmethod
     def get_history(self, currency: str, source: str, days: int) -> list[HistoryPoint]:
-        """Return up to `days` historical data points for a currency+source, sorted by date ASC."""
+        """Return a calendar-day window ending at the latest stored date, sorted ASC."""
         ...
 
     @abstractmethod

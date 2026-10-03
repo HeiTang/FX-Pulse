@@ -62,12 +62,11 @@ class TestResolveDates:
         assert dates[0] == datetime(2026, 3, 1, tzinfo=UTC)
         assert dates[-1] == datetime(2026, 3, 31, tzinfo=UTC)
 
-    def test_month_capped_at_today(self):
-        """Future month dates should be capped at today."""
-        dates = _resolve_dates(None, "2099-01", None, None)
-        # Should only return dates up to today, which is before 2099
-        # So it will return today's date since 2099-01-01 > today
-        assert len(dates) == 0 or dates[-1].date() <= datetime.now(UTC).date()
+    def test_future_month_is_usage_error(self):
+        from click import BadParameter
+
+        with pytest.raises(BadParameter, match="future"):
+            _resolve_dates(None, "2099-01", None, None)
 
     def test_range(self):
         dates = _resolve_dates(None, None, "2026-04-10", "2026-04-15")
@@ -281,3 +280,26 @@ class TestJcbFetchMonth:
         assert result[1]["JPY"]["rate"] == pytest.approx(0.200)
         assert result[2]["JPY"]["rate"] == pytest.approx(0.201)
         assert result[16]["JPY"]["rate"] == pytest.approx(0.215)
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        ["--date", "invalid"],
+        ["--date", "2026-02-30"],
+        ["--month", "2026-13"],
+        ["--month", "abcd-ef"],
+        ["--month", "2099-01"],
+        ["--date", "2099-01-01"],
+        ["--from", "invalid", "--to", "2026-01-01"],
+        ["--delay", "-1"],
+    ],
+)
+def test_invalid_cli_options_are_readable_usage_errors(options):
+    result = CliRunner().invoke(main, options)
+    assert result.exit_code == 2
+    assert "Error:" in result.output
+
+
+def test_duplicate_sources_are_fetched_once():
+    assert len(_resolve_scrapers("visa,VISA")) == 1

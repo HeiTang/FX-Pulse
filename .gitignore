@@ -32,3 +32,7 @@ pnpm-debug.log*
 
 # Virtual environments
 .venv/
+
+# Frontend test output
+web/playwright-report/
+web/test-results/

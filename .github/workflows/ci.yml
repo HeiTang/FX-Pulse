@@ -5,10 +5,14 @@ on:
     branches: [main, develop]
     paths:
       - "api/**"
+      - "web/**"
+      - ".github/workflows/ci.yml"
   pull_request:
     branches: [main, develop]
     paths:
       - "api/**"
+      - "web/**"
+      - ".github/workflows/ci.yml"
 
 jobs:
   lint-and-test:
@@ -37,25 +41,66 @@ jobs:
         run: poetry install
 
       - name: Ruff lint
-        run: poetry run ruff check src/ tests/
+        run: poetry run ruff check src/ tests/ scripts/
 
       - name: Ruff format check
-        run: poetry run ruff format --check src/ tests/
+        run: poetry run ruff format --check src/ tests/ scripts/
 
       - name: Run tests
         run: poetry run pytest -v
 
       - name: Notify Discord on CI failure
         if: failure()
-        run: |
-          BRANCH="${{ github.ref_name }}"
-          SHA="${{ github.sha }}"
-          SHORT_SHA="${SHA:0:7}"
-          REPO="${{ github.repository }}"
-          COMMIT_URL="https://github.com/$REPO/commit/$SHA"
-          RUN_URL="https://github.com/$REPO/actions/runs/${{ github.run_id }}"
-          curl -s -o /dev/null -w "%{http_code}" \
-            -H "Content-Type: application/json" \
-            -d "{\"embeds\":[{\"title\":\"❌ FX Pulse CI 失敗\",\"description\":\"**Branch:** \`$BRANCH\`\\n**Commit:** [\`$SHORT_SHA\`]($COMMIT_URL)\\n**Run:** $RUN_URL\",\"color\":15548997}]}" \
-            "${{ secrets.DISCORD_WEBHOOK_CI_CD }}"
         continue-on-error: true
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_CI_CD }}
+          BRANCH_NAME: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.sha }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          sha = os.environ['COMMIT_SHA']
+          repo = os.environ['REPOSITORY']
+          description = (
+              f"Branch: {os.environ['BRANCH_NAME']}\n"
+              f"Commit: https://github.com/{repo}/commit/{sha}\n"
+              f"Run: https://github.com/{repo}/actions/runs/{os.environ['RUN_ID']}"
+          )
+          payload = {'allowed_mentions': {'parse': []}, 'embeds': [{
+              'title': '❌ FX Pulse CI 失敗', 'description': description, 'color': 15548997
+          }]}
+          request = urllib.request.Request(
+              os.environ['DISCORD_WEBHOOK'], data=json.dumps(payload).encode(),
+              headers={'Content-Type': 'application/json'}, method='POST'
+          )
+          with urllib.request.urlopen(request, timeout=10):
+              pass
+          PY
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npm run format:check
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - name: Upload browser test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: web/playwright-report/
+          retention-days: 7

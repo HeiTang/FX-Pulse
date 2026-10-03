@@ -51,7 +51,8 @@ def _resolve_scrapers(source: str | None) -> list[Any]:
                 f"Unknown source '{name.strip()}'. Available: {', '.join(SCRAPER_MAP)}",
                 param_hint="'--source'",
             )
-        scrapers.append(SCRAPER_MAP[key]())
+        if not any(isinstance(scraper, SCRAPER_MAP[key]) for scraper in scrapers):
+            scrapers.append(SCRAPER_MAP[key]())
     return scrapers
 
 
@@ -68,16 +69,35 @@ def _resolve_dates(
 
     today = datetime.now(UTC)
 
+    def parse_date(value: str, option: str) -> date:
+        try:
+            parsed = date.fromisoformat(value)
+            if parsed.isoformat() != value:
+                raise ValueError
+            if parsed > today.date():
+                raise click.BadParameter("Date cannot be in the future", param_hint=option)
+            return parsed
+        except ValueError as exc:
+            raise click.BadParameter("Expected a valid YYYY-MM-DD date", param_hint=option) from exc
+
     if target_date:
-        d = date.fromisoformat(target_date)
+        d = parse_date(target_date, "--date")
         return [datetime(d.year, d.month, d.day, tzinfo=UTC)]
 
     if target_month:
         parts = target_month.split("-")
         if len(parts) != 2:
             raise click.BadParameter("Expected format YYYY-MM", param_hint="'--month'")
-        year, month = int(parts[0]), int(parts[1])
-        last_day = calendar.monthrange(year, month)[1]
+        try:
+            year, month = int(parts[0]), int(parts[1])
+            if f"{year:04d}-{month:02d}" != target_month:
+                raise ValueError
+            start = date(year, month, 1)
+            last_day = calendar.monthrange(year, month)[1]
+        except ValueError as exc:
+            raise click.BadParameter("Expected a valid YYYY-MM", param_hint="--month") from exc
+        if start > today.date():
+            raise click.BadParameter("Month cannot be in the future", param_hint="--month")
         end = date(year, month, last_day)
         # Don't go past today
         if end > today.date():
@@ -91,8 +111,8 @@ def _resolve_dates(
     if date_from or date_to:
         if not date_from or not date_to:
             raise click.UsageError("--from and --to must be used together.")
-        start = date.fromisoformat(date_from)
-        end = date.fromisoformat(date_to)
+        start = parse_date(date_from, "--from")
+        end = parse_date(date_to, "--to")
         if start > end:
             raise click.UsageError("--from must be before --to.")
         return [
@@ -118,7 +138,7 @@ def _run_jcb_batch(
     dry_run: bool,
     store: Any,
 ) -> dict[str, Any]:
-    """Run JCB scraper with month-level batch optimization.
+    """Run JCB scraper grouped by month (one sequential request per day).
 
     Returns a scraper result dict compatible with the --result-file format.
     """
@@ -172,7 +192,12 @@ def _run_jcb_batch(
 @click.option("--from", "date_from", default=None, help="Range start (YYYY-MM-DD)")
 @click.option("--to", "date_to", default=None, help="Range end (YYYY-MM-DD)")
 @click.option("--dry-run", is_flag=True, help="Print results without writing to store")
-@click.option("--delay", default=None, type=float, help="Fixed delay between requests (seconds)")
+@click.option(
+    "--delay",
+    default=None,
+    type=click.FloatRange(min=0),
+    help="Fixed delay between requests (seconds)",
+)
 @click.option("--result-file", default=None, help="Write scrape result summary to this JSON path")
 def main(
     source: str | None,

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from fx_pulse.scraper.jcb import JcbScraper
+from fx_pulse.scraper.jcb import JcbScraper, NoRatesError
 
 # Minimal HTML fixture matching jcb.jp table structure
 MOCK_HTML = """
@@ -134,7 +134,7 @@ class TestFetchMonth:
 
         def side_effect(date, currencies):
             if date.day == 13:  # simulate weekend
-                raise ValueError("404")
+                raise NoRatesError("404")
             return {"JPY": {"rate": 0.199, "reverse": 5.025}}
 
         with patch.object(scraper, "fetch_all", side_effect=side_effect):
@@ -143,3 +143,25 @@ class TestFetchMonth:
         assert 12 in result
         assert 13 not in result
         assert 14 in result
+
+
+class TestInvalidJcbData:
+    def test_usd_uses_identity_cross_rate(self):
+        result = JcbScraper()._compute_cross_rate(EXPECTED_RAW, "USD")
+        assert result == {"rate": TWD_SELL, "reverse": 1 / TWD_SELL}
+
+    @pytest.mark.parametrize("value", [0, -1, float("nan"), float("inf")])
+    def test_invalid_twd_rate_is_rejected(self, value):
+        raw = {**EXPECTED_RAW, "TWD": {"sell": value}}
+        assert JcbScraper()._compute_cross_rate(raw, "JPY") is None
+
+    def test_empty_page_is_error_not_success(self):
+        scraper = TestFetchAll()._mock_scraper("<html>No rates</html>")
+        with pytest.raises(ValueError, match="no rate table"):
+            scraper.fetch_all()
+
+    def test_parser_errors_are_not_silently_skipped_in_month(self):
+        scraper = JcbScraper()
+        with patch.object(scraper, "fetch_all", side_effect=ValueError("malformed table")):
+            with pytest.raises(ValueError, match="malformed table"):
+                scraper.fetch_month(2026, 4, [1, 2])

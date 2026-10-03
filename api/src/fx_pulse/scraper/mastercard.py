@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from typing import Any
 
@@ -36,7 +37,7 @@ class MastercardScraper(BaseScraper):
             raise ValueError("Mastercard response missing 'data.conversionRate'")
 
         rate = float(inner["conversionRate"])
-        if rate <= 0:
+        if not math.isfinite(rate) or rate <= 0:
             raise ValueError(f"Invalid conversionRate: {rate}")
 
         reverse = 1.0 / rate

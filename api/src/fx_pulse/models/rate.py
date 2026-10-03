@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # ── Core ───────────────────────────────────────────────────────────────────────
 
 
 class CurrencyRate(BaseModel):
-    rate: float  # 1 foreign = X TWD
-    reverse: float  # 1 TWD = X foreign
+    rate: float = Field(gt=0, allow_inf_nan=False)  # 1 foreign = X TWD
+    reverse: float = Field(gt=0, allow_inf_nan=False)  # 1 TWD = X foreign
 
 
 class RatesMeta(BaseModel):

@@ -17,12 +17,4 @@ def get_store() -> BaseStore:
 
         return JsonStore()
 
-    # Future backends:
-    # if backend == "turso":
-    #     from .turso_store import TursoStore
-    #     return TursoStore()
-    # if backend == "d1":
-    #     from .d1_store import D1Store
-    #     return D1Store()
-
     raise ValueError(f"Unknown storage backend: '{backend}'")

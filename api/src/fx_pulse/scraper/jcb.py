@@ -7,6 +7,7 @@ Formula: TWD/currency = (TWD/USD sell) / (currency/USD buy)
 from __future__ import annotations
 
 import logging
+import math
 import random
 import re
 import time
@@ -22,6 +23,10 @@ logger = logging.getLogger(__name__)
 _ua = UserAgent()
 
 BASE_URL = "https://www.jcb.jp/rate/usd{date}.html"
+
+
+class NoRatesError(ValueError):
+    """The upstream page is absent for this date (HTTP 404)."""
 
 
 class JcbScraper:
@@ -56,7 +61,7 @@ class JcbScraper:
         """Fetch cross-rates for the given date.
 
         Returns: {"USD": {"rate": 31.588, "reverse": 0.031628}, ...}
-        Raises ValueError if jcb.jp has no data for that date (404 / weekend).
+        Raises NoRatesError if jcb.jp has no data for that date (404 / weekend).
         """
         if date is None:
             date = datetime.now(UTC)
@@ -84,6 +89,9 @@ class JcbScraper:
                 rate_data["reverse"],
             )
 
+        if not result:
+            raise ValueError("JCB returned no usable cross-rates")
+
         logger.info("[%s] Fetch complete | %d currencies", self.source_name, len(result))
         return result
 
@@ -109,7 +117,7 @@ class JcbScraper:
             d = datetime(year, month, day, tzinfo=UTC)
             try:
                 result[day] = self.fetch_all(date=d, currencies=currencies)
-            except ValueError as exc:
+            except NoRatesError as exc:
                 logger.warning("[%s] Day %d skipped: %s", self.source_name, day, exc)
 
         logger.info("[%s] Batch complete | %d days", self.source_name, len(result))
@@ -121,7 +129,7 @@ class JcbScraper:
         """Fetch and parse jcb.jp table for the given date.
 
         Returns: {"JPY": {"buy": 158.96, "mid": 159.20, "sell": 159.45}, "TWD": {...}, ...}
-        Raises ValueError on 404 (weekend / holiday / no data yet).
+        Raises NoRatesError on 404 (weekend / holiday / no data yet).
         """
         url = BASE_URL.format(date=date.strftime("%m%d%Y"))
         max_retries = settings.scraper_max_retries
@@ -132,11 +140,14 @@ class JcbScraper:
                 resp = self.session.get(url, timeout=settings.scraper_timeout)
 
                 if resp.status_code == 404:
-                    raise ValueError(f"[{self.source_name}] No rates for {date.date()} (404)")
+                    raise NoRatesError(f"[{self.source_name}] No rates for {date.date()} (404)")
 
                 _check_cloudflare(resp)
                 resp.raise_for_status()
-                return self._parse_html(resp.text)
+                raw = self._parse_html(resp.text)
+                if not raw:
+                    raise ValueError("JCB response contains no rate table")
+                return raw
 
             except (ValueError, CloudflareBlockedError):
                 raise  # 404 / CF block — don't retry
@@ -155,6 +166,8 @@ class JcbScraper:
                     delay,
                 )
                 # Reset session so next attempt picks a fresh impersonate target
+                if self._session is not None:
+                    self._session.close()
                 self._session = None
                 time.sleep(delay)
 
@@ -199,11 +212,11 @@ class JcbScraper:
 
         TWD/currency = (TWD/USD sell) / (currency/USD buy)
         """
-        if "TWD" not in raw or currency not in raw:
+        if "TWD" not in raw or (currency != "USD" and currency not in raw):
             return None
         twd_sell = raw["TWD"]["sell"]
-        currency_buy = raw[currency]["buy"]
-        if currency_buy == 0:
+        currency_buy = 1.0 if currency == "USD" else raw[currency]["buy"]
+        if not all(math.isfinite(v) and v > 0 for v in (twd_sell, currency_buy)):
             return None
         rate = twd_sell / currency_buy
         return {"rate": rate, "reverse": 1.0 / rate}
