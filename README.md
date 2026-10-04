@@ -17,63 +17,145 @@
 
 ## ✨ 功能亮點
 
-- **三來源同步比較**：同一幣別、同一天，並列 VISA、Mastercard、JCB 的換算台幣金額與差額，最低換算額自動標示；缺少來源就顯示無資料，不混用其他日期。
+- **三家一眼比較**：並列 VISA、Mastercard、JCB 的台幣換算金額，清楚標示最低換算額與差額。
 
-- **消費金額試算**：支援 USD、JPY、EUR、GBP、HKD、AUD、KRW、SGD。JPY／KRW 限整數，其他追蹤幣別最多兩位小數；金額須大於零，上限 10 億。
+- **消費金額試算**：支援日圓、美元等 8 種常用幣別，輸入消費金額，就能查看換算結果。
 
-- **手機操作優先**：幣別國旗捷徑、大字金額與可展開的幣別總覽；自訂日期日曆只允許選取有資料的日期。
+- **手機輕鬆操作**：大字金額、國旗幣別捷徑與簡潔版面，方便在旅途中查詢。
 
-- **JCB Cross-Rate 解析**：從 jcb.jp 每日公開費率頁取得 USD 基準匯率，以 `TWD/外幣 = (TWD/USD sell) / (外幣/USD buy)` 估算，支援全 8 幣別；USD 分母為 1。
+- **歷史匯率查詢**：選擇日期查看當天匯率，搭配 7 天、30 天或全部歷史走勢，掌握匯率變化。
 
-- **互動走勢圖**：ECharts 顯示截至所選日期的 7 個日曆日、30 個日曆日或全部歷史，可切換幣別與來源；缺資料日不補造匯率，線段可能跨過缺資料日。
+- **每日自動更新**：持續整理每日參考匯率，清楚顯示資料日期。
 
-- **自動回補缺漏**：GitHub Actions 每日抓取後，掃描近 7 天缺漏的「日期＋來源」並嘗試回補；JCB 週末自動略過。來源阻擋、假日或格式變更仍可能造成缺漏。
+- **Bot 防護處理**：使用 curl-cffi 模擬瀏覽器 TLS 指紋；遇到 Cloudflare 阻擋時會明確回報，避免反覆無效重試。
 
-- **彈性 CLI 與狀態回報**：可指定來源、日期、區間、月份，支援 dry-run 與結果報告；JCB 月份抓取採逐日循序請求。請求失敗有限重試，Cloudflare 阻擋會停止該來源。
+- **自動回補缺漏**：每日抓取後，自動檢查近 7 天缺少的日期與來源並嘗試回補；JCB 週末自動略過。
 
-- **靜態網站架構**：Astro 讀取 `rates.json` 建置，透過 GitHub Pages 託管，無需常駐 API 伺服器。匯率日期與資料檔最後寫入時間分開顯示，開啟頁面時不會即時查詢外部匯率。
+- **彈性 CLI**：可指定來源、日期、區間或月份，支援 dry-run 預覽；JCB 月份抓取採逐日循序請求。
 
-本專案為非官方工具。**換算額未計銀行手續費、回饋及實際入帳日期，不能視為實際帳單或信用卡推薦。** VISA 查詢設定 `fee=0`；Mastercard 設定 `bank_fee=0`。JCB 使用 jcb.jp 公開 USD 基準頁，依 `TWD/外幣 = (TWD/USD sell) / (外幣/USD buy)` 估算；USD 分母為 1。
+本專案為非官方工具。**換算額未計銀行手續費、回饋及實際入帳日期，非實際帳單；JCB 為交叉匯率估算。**
 
-## 本機開發
+## 🚀 快速開始
 
-需求：Node.js 22.12+、Python 3.12+、Poetry。
+### 啟動網頁
+
+需求：Node.js 22.12+、Git。
 
 ```bash
-cd web
+git clone https://github.com/HeiTang/FX-Pulse.git
+cd FX-Pulse/web
 npm ci
-npm run dev                  # http://localhost:4321
+npm run dev
 ```
 
-前端是 Astro 7、Tailwind CSS 4、TypeScript、ECharts 6。開發及預覽不需啟動 API。
+開啟 [http://localhost:4321](http://localhost:4321)，選擇消費幣別、輸入金額，再選擇匯率日期，即可查看換算結果與歷史走勢。
+
+前端直接使用專案內的匯率資料，啟動網頁不需另外啟動 API。
+
+### 更新匯率資料
+
+需求：Python 3.12+、Poetry。另開終端機，在專案根目錄執行：
 
 ```bash
 cd api
 poetry install
+poetry run fetch-rates
+```
+
+這會抓取今日匯率並更新 `web/src/data/rates.json`。指定日期、試跑與回補方式見下方「CLI 用法」。
+
+## 🛠 CLI 用法
+
+先依快速開始安裝 Python 套件，以下指令皆在 `api/` 目錄執行。未加 `--dry-run` 時，成功取得的匯率會寫入 `web/src/data/rates.json`。
+
+### `fetch-rates` — 抓取匯率
+
+```bash
+# 抓取今日全部來源
+poetry run fetch-rates
+
+# 指定來源，可用逗號分隔，大小寫不限
+poetry run fetch-rates --source VISA,JCB
+
+# 指定單日
+poetry run fetch-rates --date 2026-04-15
+
+# 指定月份
+poetry run fetch-rates --month 2026-04
+
+# 指定日期區間，設定幣別請求間隔為 2 秒
+poetry run fetch-rates --from 2026-04-01 --to 2026-04-16 --delay 2
+
+# 查詢並印出結果，不寫入匯率資料
+poetry run fetch-rates --source JCB --date 2026-04-15 --dry-run
+```
+
+`--date`、`--month`、`--from/--to` 三種日期選擇方式不可混用；`--from` 與 `--to` 必須成對使用。不接受未來日期，當月只抓到今天。JCB 月份抓取採逐日循序請求。
+
+### `backfill-rates` — 回補缺漏
+
+```bash
+# 檢查近 7 天（預設），並抓取缺少的日期與來源
+poetry run backfill-rates
+
+# 指定回溯天數
+poetry run backfill-rates --days 14
+
+# 只回補指定來源
+poetry run backfill-rates --source VISA,Mastercard
+
+# 只列出缺漏，不查詢外部來源，也不寫入匯率資料
+poetry run backfill-rates --days 7 --dry-run
+```
+
+JCB 回補會略過週末；來源阻擋或未發布資料時，仍可能無法補齊。
+
+### 儲存執行報告
+
+兩個指令都支援 `--result-file`，方便查看執行結果或交由自動化程式判斷：
+
+```bash
+poetry run fetch-rates --result-file scrape_result.json
+poetry run backfill-rates --days 7 --result-file backfill_result.json
+```
+
+結果檔記錄整體與各來源的執行狀態、錯誤資訊；回補報告另記錄找到的缺漏數量。這些報告與匯率資料分開儲存。自動化應檢查報告的 `status`，不要只依 CLI 退出碼判斷抓取成功。
+
+### 查看完整參數
+
+```bash
+poetry run fetch-rates --help
+poetry run backfill-rates --help
+```
+
+## API 使用
+
+若需要透過 HTTP 取得匯率，可在已安裝套件的 `api/` 目錄啟動 FastAPI：
+
+```bash
 poetry run uvicorn fx_pulse.main:app --reload
 ```
 
-FastAPI 提供 `/rates/latest?source=VISA` 及 `/rates/history/JPY?source=VISA&days=30`。歷史 API 的天數是截至最新儲存日期的日曆日範圍；來源缺資料不會自動填入。
+- 最新匯率：`http://127.0.0.1:8000/rates/latest?source=VISA`
+- 歷史匯率：`http://127.0.0.1:8000/rates/history/JPY?source=VISA&days=30`
+- API 文件：`http://127.0.0.1:8000/docs`
 
-## 抓取與回補
+歷史 API 的天數是截至最新儲存日期的日曆日範圍；來源缺資料不會自動填入。
 
-以下指令會查詢外部資料來源；不加 `--dry-run` 會寫入資料檔案。
+## 環境變數（選用）
 
-```bash
-cd api
-poetry run fetch-rates
-poetry run fetch-rates --source VISA,JCB --date 2026-04-15 --dry-run
-poetry run fetch-rates --month 2026-04
-poetry run fetch-rates --from 2026-04-01 --to 2026-04-16 --delay 2
-poetry run backfill-rates --days 7 --dry-run
-poetry run backfill-rates --days 14 --source VISA,Mastercard
+一般使用不需要設定，後端會採用預設值。需要調整抓取逾時、請求間隔、追蹤幣別或資料檔案路徑時，才使用這些設定。
+
+可參考 [.env.example](.env.example)，在專案根目錄建立 `.env`，例如將抓取逾時調整為 30 秒：
+
+```dotenv
+FX_SCRAPER_TIMEOUT=30
 ```
 
-日期／月份／區間不可混用，也不接受未來日期。JCB 月份抓取以逐日循序請求進行；404 略過，解析失敗會回報錯誤。爬蟲使用有限重試與請求間隔；Cloudflare 阻擋會停止該來源。自動化需透過 `--result-file result.json` 檢查 `status`，CLI 抓取錯誤會保留在結果摘要中。JSON 以暫存檔原子替換，寫入中斷不截斷舊資料；空匯率集合不能覆蓋既有來源。
+CLI 下次執行時會讀取新設定；已啟動的 API 需重新啟動。也可透過執行環境設定相同的 `FX_` 變數，環境變數優先於 `.env`。
 
-## 環境變數
+這些設定作用於後端，前端建置仍讀取 `web/src/data/rates.json`；若另設資料輸出路徑，需自行將資料同步回該檔案。
 
-設定於 專案根目錄的 `.env` 或環境變數，前綴為 `FX_`。
 
 | 變數 | 預設值 | 說明 |
 | --- | --- | --- |
@@ -85,7 +167,20 @@ poetry run backfill-rates --days 14 --source VISA,Mastercard
 | `FX_SCRAPER_DELAY_MAX` | `3.5` | 幣別請求最大間隔秒數 |
 | `FX_SCRAPER_BACKOFF_CAP` | `60` | 重試等待上限秒數 |
 
-## 驗證
+## 資料說明
+
+- 網頁使用 `web/src/data/rates.json` 建置，開啟頁面時不會即時查詢外部匯率。匯率日期與資料檔最後寫入時間分開顯示；缺少來源時不混用其他日期。
+- VISA 查詢設定 `fee=0`，Mastercard 設定 `bank_fee=0`。JCB 使用 jcb.jp 公開 USD 基準頁，依 `TWD/外幣 = (TWD/USD sell) / (外幣/USD buy)` 估算；USD 分母為 1。
+- JPY／KRW 消費金額限整數，其他追蹤幣別最多兩位小數；金額須大於零，上限 10 億。
+- 歷史走勢的 7／30 天以日曆日計算，缺資料日不補造匯率，線段可能跨過缺資料日。
+- 每日抓取後嘗試回補近 7 天缺漏，JCB 回補略過週末。來源阻擋、假日或格式變更仍可能造成缺漏。
+- JSON 以暫存檔原子替換，寫入中斷不截斷舊資料；空匯率集合不能覆蓋既有來源。
+
+## 開發驗證
+
+以下指令分別從專案根目錄執行，並先完成對應套件安裝。
+
+### 後端
 
 ```bash
 cd api
@@ -93,6 +188,8 @@ poetry run ruff check src tests scripts
 poetry run ruff format --check src tests scripts
 poetry run pytest -q
 ```
+
+### 前端
 
 ```bash
 cd web
@@ -105,14 +202,8 @@ npm run test:e2e
 npm audit
 ```
 
-若 Mac 已安裝 Chrome，可用 `PW_BROWSER_CHANNEL=chrome npm run test:e2e`。瀏覽器測試啟動獨立的 `127.0.0.1:4322` 預覽，涵蓋 1280、768、680、390、320px、金額／精度、同日換算／差額、缺來源、日曆範圍／鍵盤、走勢切換、總覽、資產載入及 axe 無障礙檢查。手機測試使用 Chromium 模擬，不能代替真機 Safari。後端測試以固定回應與 mock 驗證解析／重試，不呼叫外部匯率站或發送 Discord。
+瀏覽器測試涵蓋桌面與手機尺寸的主要操作，CI 也會執行這些檢查。若使用 Mac 已安裝的 Chrome，可將瀏覽器測試指令改為 `PW_BROWSER_CHANNEL=chrome npm run test:e2e`，不必另下載 Chromium。
 
-CI 執行前後端檢查及瀏覽器測試。`npm audit` 目前仍回報 Astro 間接依賴 `http-cache-semantics@4.2.0` 的 [GHSA-ch52-4w7c-c8xp](https://github.com/advisories/GHSA-ch52-4w7c-c8xp)，上游尚無修正版（2026-10-04 檢查）。Astro 在遠端圖片建置快取中引用它；本專案只使用本機 SVG／ICO，且輸出靜態 HTML，沒有共享使用者回應快取。仍須追蹤上游更新，不能宣稱 audit 全通過。
+---
 
-## 程式與素材
-
-- `api/src/fx_pulse/`：CLI、FastAPI、來源爬蟲及 JSON 儲存。
-- `web/src/pages/index.astro`：頁面結構；`web/src/lib/`：試算、匯率規則、日曆及延後載入的圖表。
-- `web/src/data/rates.json`：既有資料介面，由排程更新。
-- `web/tests/`、`api/tests/`：可重跑的回歸測試。
-- 圖示出處與授權見 [web/ASSETS.md](web/ASSETS.md)；`logo/` 保留專案品牌 SVG 原始素材。
+圖示來源與授權：[素材說明](web/ASSETS.md)。
