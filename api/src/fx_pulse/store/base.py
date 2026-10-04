@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime, timedelta
 
+from ..config import settings
 from ..models.rate import CurrencyRate, HistoryPoint, RatesPayload
 
 # Type alias: {"USD": CurrencyRate(...), "JPY": CurrencyRate(...)}
@@ -19,7 +20,7 @@ class BaseStore(ABC):
 
     @abstractmethod
     def upsert_rates(self, date_key: str, source: str, rates: SourceRates) -> None:
-        """Write or overwrite rates for a given date and source."""
+        """Merge currencies for a given date and source, preserving other currencies."""
         ...
 
     @abstractmethod
@@ -41,7 +42,7 @@ class BaseStore(ABC):
         ...
 
     def find_missing(self, sources: list[str], days: int = 7) -> list[tuple[str, str]]:
-        """Return (date_key, source) pairs absent from the last `days` days.
+        """Return absent or incomplete (date_key, source) pairs from the last `days` days.
 
         JCB is skipped on weekends — jcb.jp does not publish Saturday/Sunday rates.
         Days are counted backwards from today (inclusive).
@@ -57,7 +58,7 @@ class BaseStore(ABC):
             for source in sources:
                 if source.lower() == "jcb" and d.weekday() >= 5:  # Sat=5, Sun=6
                     continue
-                if not existing.get(source):
+                if set(settings.currencies) - existing.get(source, {}).keys():
                     missing.append((date_key, source))
 
         return missing

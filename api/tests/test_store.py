@@ -112,6 +112,10 @@ class TestJsonStore:
 
 
 class TestFindMissing:
+    @pytest.fixture(autouse=True)
+    def configured_currency(self, monkeypatch):
+        monkeypatch.setattr("fx_pulse.store.base.settings.currencies", ["USD"])
+
     # 2026-04-21 = Tuesday, 2026-04-19 = Sunday, 2026-04-18 = Saturday
 
     def test_present_entry_not_reported(self, tmp_path):

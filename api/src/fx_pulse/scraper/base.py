@@ -1,7 +1,7 @@
 """Abstract base scraper — shared retry logic, logging, and interface contract.
 
 VISA and Mastercard scrapers inherit from this class,
-ensuring consistent behavior for retry, backoff, UA rotation, and logging.
+ensuring consistent behavior for retry, backoff, browser profiles, and logging.
 """
 
 from __future__ import annotations
@@ -14,13 +14,18 @@ from datetime import UTC, datetime
 from typing import Any
 
 from curl_cffi import requests as cf_requests
-from fake_useragent import UserAgent
 
 from ..config import settings
 from ..models.rate import CurrencyRate
+from .retry import (
+    PermanentHTTPError,
+    RateLimitError,
+    check_http_status,
+    retry_after_seconds,
+    retry_delay,
+)
 
 logger = logging.getLogger(__name__)
-_ua = UserAgent()
 
 # Rotate across engines/versions — CF bot detection is fingerprint-aware.
 # Only targets confirmed available in curl_cffi >= 0.7; chrome133 removed (unsupported).
@@ -33,7 +38,7 @@ _IMPERSONATE_TARGETS = [
 ]
 
 
-class CloudflareBlockedError(RuntimeError):
+class CloudflareBlockedError(RateLimitError):
     """Raised when a Cloudflare challenge/block is detected."""
 
 
@@ -41,17 +46,31 @@ def _check_cloudflare(resp: Any) -> None:
     """Raise CloudflareBlockedError if the response looks like a CF block."""
     if resp.status_code not in (403, 429, 503):
         return
+    # cf-ray alone also appears on ordinary origin errors and rate limits.
     is_cf = (
-        "cf-ray" in resp.headers
-        or resp.headers.get("server", "").lower() == "cloudflare"
-        or "cloudflare" in resp.text.lower()
+        resp.headers.get("cf-mitigated") == "challenge"
         or "just a moment" in resp.text.lower()
+        or "cf-chl-" in resp.text.lower()
+        or (
+            resp.status_code == 403
+            and ("cf-ray" in resp.headers or "cloudflare" in resp.text.lower())
+        )
     )
     if is_cf:
         raise CloudflareBlockedError(
             f"Cloudflare block: HTTP {resp.status_code} "
-            f"(cf-ray: {resp.headers.get('cf-ray', 'n/a')})"
+            f"(cf-ray: {resp.headers.get('cf-ray', 'n/a')})",
+            retry_after_seconds=retry_after_seconds(resp),
         )
+
+
+class BatchFetchError(RuntimeError):
+    """A failed batch with validated rates that can still be saved."""
+
+    def __init__(self, cause: Exception, rates: dict[str, dict[str, float]]) -> None:
+        super().__init__(str(cause))
+        self.cause = cause
+        self.rates = rates
 
 
 class BaseScraper(ABC):
@@ -78,7 +97,6 @@ class BaseScraper(ABC):
                     "sec-fetch-dest": "empty",
                     "sec-fetch-mode": "cors",
                     "sec-fetch-site": "same-origin",
-                    "user-agent": _ua.random,
                 }
             )
         return self._session
@@ -106,6 +124,7 @@ class BaseScraper(ABC):
         max_retries = settings.scraper_max_retries
 
         for attempt in range(max_retries):
+            resp = None
             try:
                 params = self._build_params(currency, date_str)
                 logger.info(
@@ -129,6 +148,7 @@ class BaseScraper(ABC):
                     len(resp.content),
                 )
                 _check_cloudflare(resp)
+                check_http_status(resp)
                 resp.raise_for_status()
 
                 data = resp.json()
@@ -144,10 +164,15 @@ class BaseScraper(ABC):
                 )
                 return result
 
-            except CloudflareBlockedError:
-                raise  # don't retry CF blocks
+            except (CloudflareBlockedError, PermanentHTTPError, ValueError, KeyError, TypeError):
+                raise  # Blocks, client errors and invalid payloads need a later run or a fix.
             except Exception as exc:
                 if attempt == max_retries - 1:
+                    if resp is not None and resp.status_code == 429:
+                        raise RateLimitError(
+                            "HTTP 429: retry budget exhausted",
+                            retry_after_seconds=retry_after_seconds(resp),
+                        ) from exc
                     logger.error(
                         "[%s] %s/TWD | FAILED after %d attempts: %s",
                         self.source_name,
@@ -160,8 +185,7 @@ class BaseScraper(ABC):
                         f"after {max_retries} attempts"
                     ) from exc
 
-                delay = min(settings.scraper_backoff_cap, 1.0 * (2**attempt))
-                sleep = random.uniform(0, delay)
+                sleep = retry_delay(attempt, resp)
                 logger.warning(
                     "[%s] %s/TWD | attempt %d/%d failed: %s — retry in %.1fs",
                     self.source_name,
@@ -202,9 +226,13 @@ class BaseScraper(ABC):
         )
 
         result: dict[str, dict[str, float]] = {}
-        for currency in currencies:
-            result[currency] = self.fetch_one(currency, date_str)
-            time.sleep(random.uniform(settings.scraper_delay_min, settings.scraper_delay_max))
+        for index, currency in enumerate(currencies):
+            try:
+                result[currency] = self.fetch_one(currency, date_str)
+            except Exception as exc:
+                raise BatchFetchError(exc, result) from exc
+            if index < len(currencies) - 1:
+                time.sleep(random.uniform(settings.scraper_delay_min, settings.scraper_delay_max))
 
         logger.info("[%s] Batch complete | %d currencies fetched", self.source_name, len(result))
         return result
