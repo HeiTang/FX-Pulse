@@ -198,3 +198,124 @@ test('layout, assets and accessibility remain usable including large totals and 
   ).toEqual([]);
   expect(failures).toEqual([]);
 });
+
+test('direction switch preserves input and compares foreign budget amounts for every currency', async ({
+  page,
+}) => {
+  await page.locator('#rate-date').evaluate((element, date) => {
+    (element as HTMLInputElement).value = date;
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+  }, comparable);
+  await page.locator('#swap-direction').click();
+  await expect(page.locator('#amount')).toHaveValue('10,000');
+  await page.locator('#amount').fill('123.45');
+  await expect(page.locator('#amount')).toHaveAttribute(
+    'aria-invalid',
+    'false',
+  );
+  await expect(page.locator('#amount-code')).toHaveText('TWD');
+  await expect(page.locator('#amount-label')).toHaveText('台幣預算');
+  for (const code of ratesData.meta.currencies) {
+    await page.locator('#currency').selectOption(code);
+    const format = new Intl.NumberFormat('zh-TW', {
+      style: 'currency',
+      currency: code,
+    });
+    const digits = format.resolvedOptions().maximumFractionDigits;
+    const amountFormat = new Intl.NumberFormat('zh-TW', {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    });
+    const entries = rateEntries(days, code, comparable);
+    const best = Math.max(...entries.map((entry) => 123.45 / entry.rate));
+    for (const entry of entries) {
+      const row = page.locator('.result-row').filter({
+        has: page.locator('.result-source strong', { hasText: entry.src }),
+      });
+      const total = 123.45 / entry.rate;
+      await expect(row.locator('.result-total')).toHaveText(
+        `${code} ${amountFormat.format(total)}`,
+      );
+      if (Math.abs(total - best) < 1e-7)
+        await expect(row.locator('.result-difference')).toHaveText(
+          '最高可換得金額',
+        );
+      else await expect(row.locator('.result-difference')).toContainText('−');
+    }
+    await expect(page.locator('#comparison-context')).toHaveText(
+      `TWD → ${code}`,
+    );
+    await expect(page.locator('#chart-title')).toHaveText(`TWD / ${code}`);
+  }
+  await page.locator('#currency').selectOption('JPY');
+  await page.locator('#swap-direction').press('Enter');
+  await expect(page.locator('#swap-direction')).toBeFocused();
+  await expect(page.locator('#swap-direction')).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
+  await expect(page.locator('#amount')).toHaveValue('123.45');
+  await expect(page.locator('#amount')).toHaveAttribute('aria-invalid', 'true');
+  await page.locator('#swap-direction').press('Space');
+  await expect(page.locator('#amount')).toHaveAttribute(
+    'aria-invalid',
+    'false',
+  );
+});
+
+test('reverse mode handles missing data, rapid switches, overview and mobile accessibility', async ({
+  page,
+}) => {
+  await page.locator('#swap-direction').click();
+  for (const src of ['VISA', 'Mastercard', 'JCB']) {
+    if (!days[latest]?.[src as keyof (typeof days)[string]]?.JPY) {
+      const row = page.locator('.result-row').filter({
+        has: page.locator('.result-source strong', { hasText: src }),
+      });
+      await expect(row.locator('.result-total')).toHaveText('—');
+    }
+  }
+  for (const value of ['', '0', '-1', 'abc']) {
+    await page.locator('#amount').fill(value);
+    await expect(page.locator('#amount')).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+    await expect(page.locator('.best-badge')).toHaveCount(0);
+  }
+  await page.locator('#amount').fill('1000000000');
+  for (const code of ['USD', 'JPY', 'KRW']) {
+    await page.locator(`[data-quick-currency="${code}"]`).click();
+    await page.locator('#swap-direction').click();
+    await page.locator('#swap-direction').click();
+  }
+  await page.locator('[data-range="30"]').click();
+  await page.locator('[data-source="JCB"]').click();
+  await expect(page.locator('#chart canvas')).toHaveCount(1);
+  await expect(page.locator('#chart')).toHaveAttribute(
+    'aria-label',
+    /TWD 對 KRW.*JCB/,
+  );
+  await expect(page.locator('#chart-note')).toContainText('1 TWD = KRW');
+  const swap = (await page.locator('#swap-direction').boundingBox())!;
+  expect(swap.width).toBeGreaterThanOrEqual(44);
+  expect(swap.height).toBeGreaterThanOrEqual(44);
+  const foreign = (await page.locator('.currency-field').boundingBox())!;
+  const twd = (await page.locator('.route-destination').boundingBox())!;
+  expect(twd.x).toBeLessThan(swap.x);
+  expect(foreign.x).toBeGreaterThan(swap.x);
+  await page.locator('summary').click();
+  await expect(page.locator('#overview-hint')).toContainText('每 1 TWD');
+  await page.locator('.currency-card[data-currency="USD"]').click();
+  await expect(page.locator('#comparison-context')).toHaveText('TWD → USD');
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await expect(page.locator('#conversion-note')).toContainText(
+    '非銀行實際換匯報價',
+  );
+  const audit = await new AxeBuilder({ page }).analyze();
+  expect(audit.violations.map((item) => item.id)).toEqual([]);
+});

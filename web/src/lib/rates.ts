@@ -45,9 +45,26 @@ export function availableDates(days: RateDays): string[] {
     .sort();
 }
 
-export function rateEntries(days: RateDays, code: string, date: string) {
+export function conversionRate(
+  entry: Rate | undefined,
+  reverse = false,
+): number | undefined {
+  if (!validRate(entry?.rate)) return undefined;
+  const value = reverse ? 1 / entry.rate : entry.rate;
+  return validRate(value) ? value : undefined;
+}
+
+export function rateEntries(
+  days: RateDays,
+  code: string,
+  date: string,
+  reverse = false,
+) {
   return sources
-    .map((src) => ({ src, rate: days[date]?.[src]?.[code]?.rate }))
+    .map((src) => ({
+      src,
+      rate: conversionRate(days[date]?.[src]?.[code], reverse),
+    }))
     .filter((entry): entry is { src: Source; rate: number } =>
       validRate(entry.rate),
     );
@@ -95,7 +112,7 @@ export function validateAmount(
 ): { value: number | null; error: string } {
   raw = raw.trim();
   let error = '';
-  if (!raw) error = '請輸入消費金額。';
+  if (!raw) error = '請輸入金額。';
   else if (!/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d*)?$/.test(raw))
     error = '請輸入有效的數字金額。';
   else {
@@ -108,7 +125,7 @@ export function validateAmount(
     )
       error =
         precision === 0
-          ? `${code} 消費金額需為整數。`
+          ? `${code} 金額需為整數。`
           : `${code} 最多可輸入 ${precision} 位小數。`;
     else if (!Number.isFinite(value) || value > 1_000_000_000)
       error = '金額上限為 10 億。';

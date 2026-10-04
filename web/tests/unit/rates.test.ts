@@ -113,3 +113,27 @@ test('checked-in dataset has valid dates, supported currencies and finite positi
     }
   }
 });
+
+test('reverse conversion inverts the same-day reference rate without using stale data', () => {
+  const days: RateDays = {
+    '2026-01-01': { VISA: { JPY: { rate: 0.2, reverse: 4.9 } } },
+    '2026-01-02': { Mastercard: { JPY: { rate: 0.25, reverse: 4 } } },
+  };
+  assert.deepEqual(rateEntries(days, 'JPY', '2026-01-01', true), [
+    { src: 'VISA', rate: 5 },
+  ]);
+  assert.deepEqual(rateEntries(days, 'JPY', '2026-01-02', true), [
+    { src: 'Mastercard', rate: 4 },
+  ]);
+  assert.deepEqual(rateEntries(days, 'USD', '2026-01-02', true), []);
+  assert.equal(validateAmount('123.45', 'TWD').value, 123.45);
+  assert.equal(validateAmount('123.456', 'TWD').value, null);
+  assert.equal(validateAmount('123.45', 'JPY').value, null);
+  const invalid: RateDays = {
+    '2026-01-01': {
+      VISA: { JPY: { rate: 0, reverse: 5 } },
+      JCB: { JPY: { rate: Number.MIN_VALUE, reverse: 5 } },
+    },
+  };
+  assert.deepEqual(rateEntries(invalid, 'JPY', '2026-01-01', true), []);
+});
