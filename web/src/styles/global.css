@@ -17,46 +17,26 @@ body {
   margin: 0;
   min-width: 320px;
 }
-button {
-  font: inherit;
-}
-input {
-  font: inherit;
-}
+button,
+input,
 select {
   font: inherit;
 }
 button {
   cursor: pointer;
 }
-h1 {
-  margin: 0;
-}
-h2 {
-  margin: 0;
-}
+h1,
+h2,
 p {
   margin: 0;
 }
 [hidden] {
   display: none !important;
 }
-button:focus-visible {
-  outline: 3px solid #99b2ff;
-  outline-offset: 3px;
-}
-input:focus-visible {
-  outline: 3px solid #99b2ff;
-  outline-offset: 3px;
-}
-select:focus-visible {
-  outline: 3px solid #99b2ff;
-  outline-offset: 3px;
-}
-a:focus-visible {
-  outline: 3px solid #99b2ff;
-  outline-offset: 3px;
-}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+a:focus-visible,
 summary:focus-visible {
   outline: 3px solid #99b2ff;
   outline-offset: 3px;
@@ -107,10 +87,7 @@ h2 {
   position: relative;
   z-index: 1;
 }
-.route-board .field label {
-  display: block;
-  letter-spacing: 0.02em;
-}
+.route-board .field label,
 .route-destination > span {
   display: block;
   letter-spacing: 0.02em;
@@ -494,14 +471,8 @@ details[open] summary:after {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  * {
-    scroll-behavior: auto !important;
-    transition: none !important;
-  }
-  *:before {
-    scroll-behavior: auto !important;
-    transition: none !important;
-  }
+  *,
+  *:before,
   *:after {
     scroll-behavior: auto !important;
     transition: none !important;
@@ -529,10 +500,7 @@ h1 {
 .route-board {
   border-bottom: 1px solid #354259;
 }
-.route-board .field label {
-  color: #a1aec1;
-  font-size: 13px;
-}
+.route-board .field label,
 .route-destination > span {
   color: #a1aec1;
   font-size: 13px;
@@ -549,10 +517,7 @@ h1 {
   color: #1d2b20;
   font-size: 34px;
 }
-.route-board select {
-  color: #c7d3e4;
-  font-size: 16px;
-}
+.route-board select,
 .route-destination > span:last-child {
   color: #c7d3e4;
   font-size: 16px;
@@ -591,10 +556,7 @@ h1 {
   gap: 35px;
   align-items: start;
 }
-.field label {
-  font-size: 14px;
-  color: #a1aec1;
-}
+.field label,
 .amount-wrap > span {
   font-size: 14px;
   color: #a1aec1;
@@ -632,9 +594,7 @@ h2 {
   padding: 18px 0;
   grid-template-columns: 1fr 1.4fr 1.4fr 1fr;
 }
-.result-headline {
-  display: contents;
-}
+.result-headline,
 .result-details {
   display: contents;
 }
@@ -657,9 +617,7 @@ h2 {
   font-size: 12px;
   color: #a1aec1;
 }
-.is-best .result-total strong {
-  color: #c2eb74;
-}
+.is-best .result-total strong,
 .best-badge {
   color: #c2eb74;
 }
@@ -676,10 +634,7 @@ h2 {
 .comparison-message {
   color: #ffcc8b;
 }
-#chart-title {
-  font-size: 12px;
-  color: #a1aec1;
-}
+#chart-title,
 .chart-note {
   font-size: 12px;
   color: #a1aec1;
@@ -723,10 +678,7 @@ h2 {
 summary {
   min-height: 60px;
 }
-summary span {
-  font-size: 12px;
-  color: #a1aec1;
-}
+summary span,
 .section-hint {
   font-size: 12px;
   color: #a1aec1;
@@ -743,10 +695,7 @@ summary span {
 .card-code {
   font-size: 15px;
 }
-.card-code small {
-  font-size: 12px;
-  color: #a1aec1;
-}
+.card-code small,
 .card-source {
   font-size: 12px;
   color: #a1aec1;
@@ -788,15 +737,11 @@ summary span {
   .route-arrow {
     font-size: 28px;
   }
-  .route-board .field label {
-    font-size: 12px;
-  }
+  .route-board .field label,
   .route-destination > span {
     font-size: 12px;
   }
-  .route-board select {
-    font-size: 15px;
-  }
+  .route-board select,
   .route-destination > span:last-child {
     font-size: 15px;
   }
@@ -997,9 +942,7 @@ summary span {
   border: 0;
   gap: 2px;
 }
-.segmented button {
-  border-radius: 14px;
-}
+.segmented button,
 .source-filters button {
   border-radius: 14px;
 }
@@ -1047,12 +990,8 @@ summary span {
   #amount {
     font-size: 43px;
   }
-  .route-board {
-    padding-inline: 0;
-  }
-  .input-panel {
-    padding-inline: 0;
-  }
+  .route-board,
+  .input-panel,
   .comparison {
     padding-inline: 0;
   }
