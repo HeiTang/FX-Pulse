@@ -29,7 +29,7 @@
 
 - **Bot 防護處理**：使用 curl-cffi 模擬瀏覽器 TLS 指紋；遇到 Cloudflare 阻擋時會明確回報，避免反覆無效重試。
 
-- **自動回補缺漏**：每日抓取後，自動檢查近 7 天缺少的日期與來源並嘗試回補；JCB 週末自動略過。
+- **自動回補缺漏**：每日分開時段檢查近 7 天缺少的日期、來源與幣別並嘗試回補；已成功的資料會保留，JCB 週末自動略過。
 
 - **彈性 CLI**：可指定來源、日期、區間或月份，支援 dry-run 預覽；JCB 月份抓取採逐日循序請求。
 
@@ -108,7 +108,7 @@ poetry run backfill-rates --source VISA,Mastercard
 poetry run backfill-rates --days 7 --dry-run
 ```
 
-JCB 回補會略過週末；來源阻擋或未發布資料時，仍可能無法補齊。
+回補只請求缺少的幣別，並與既有資料合併；不會重抓已完整的日期／來源。JCB 略過週末；來源阻擋或未發布資料時，仍可能無法補齊。
 
 ### 儲存執行報告
 
@@ -119,7 +119,7 @@ poetry run fetch-rates --result-file scrape_result.json
 poetry run backfill-rates --days 7 --result-file backfill_result.json
 ```
 
-結果檔記錄整體與各來源的執行狀態、錯誤資訊；回補報告另記錄找到的缺漏數量。這些報告與匯率資料分開儲存。自動化應檢查報告的 `status`，不要只依 CLI 退出碼判斷抓取成功。
+結果檔記錄整體與各來源的執行狀態、錯誤資訊；回補報告另記錄缺漏日期／來源組數（`missing_found`／`missing_remaining`）、補回與仍缺少的日期／來源／幣別筆數（`currencies_recovered`／`currencies_remaining`），以及冷卻來源的 `next_retry_at`（UTC）。這些報告與匯率資料分開儲存。自動化應檢查報告的 `status`，不要只依 CLI 退出碼判斷抓取成功。
 
 ### 查看完整參數
 
@@ -161,11 +161,26 @@ CLI 下次執行時會讀取新設定；已啟動的 API 需重新啟動。也�
 | --- | --- | --- |
 | `FX_DATA_FILE` | `web/src/data/rates.json` | 資料檔案路徑 |
 | `FX_CURRENCIES` | `["USD","JPY","EUR","GBP","HKD","AUD","KRW","SGD"]` | 追蹤幣別（JSON 陣列） |
+| `FX_SCRAPER_STATE_FILE` | `api/scrape_state.json`（專案根目錄下） | 跨次執行的來源冷卻狀態 |
 | `FX_SCRAPER_TIMEOUT` | `20` | HTTP 逾時秒數 |
-| `FX_SCRAPER_MAX_RETRIES` | `5` | 最大嘗試次數 |
-| `FX_SCRAPER_DELAY_MIN` | `1.5` | 幣別請求最小間隔秒數 |
-| `FX_SCRAPER_DELAY_MAX` | `3.5` | 幣別請求最大間隔秒數 |
+| `FX_SCRAPER_MAX_RETRIES` | `3` | 單次請求最大嘗試次數，包含首次 |
+| `FX_SCRAPER_DELAY_MIN` | `3` | 幣別／日期請求最小間隔秒數 |
+| `FX_SCRAPER_DELAY_MAX` | `6` | 幣別／日期請求最大間隔秒數 |
+| `FX_SCRAPER_BACKOFF_BASE` | `5` | 指數退避起始秒數 |
 | `FX_SCRAPER_BACKOFF_CAP` | `60` | 重試等待上限秒數 |
+
+## 抓取排程與重試
+
+- 台灣時間 **11:17** 抓取當日匯率，**17:47、23:47** 僅回補近 7 天缺漏。GitHub Actions 可能延遲執行；抓取與回補不會並行寫入資料。
+- 正常請求間隔隨機 **3～6 秒**。連線錯誤、一般 429／5xx 最多嘗試 **3 次**，等待時間採 Full Jitter：`random(0, min(60, 5 × 2^attempt))`。預設兩次重試分別等待 0～5、0～10 秒。
+- 有有效 `Retry-After` 時，等待不短於伺服器要求；超過 60 秒則停止該來源於本輪的抓取。下次可重試時間會持久保存，手動執行也遵守冷卻。
+- 封鎖／限流後按來源冷卻 **6 → 12 → 24 小時**，後續維持 24 小時；如果 `Retry-After` 更長則採其要求。冷卻期間不發請求也不累加失敗次數，實際完整成功後重設。
+- 冷卻狀態保存在 `api/scrape_state.json`，排程會與匯率資料一起提交，下一次 checkout 可讀回；不要刪除此檔來強制重試。自訂資料目錄時可同時設定 `FX_SCRAPER_STATE_FILE`。
+- Cloudflare challenge／封鎖立即停止該來源本輪抓取；一般 4xx（429 除外）與資料格式錯誤不立即重試。每日抓取後不再立刻回補同一來源。
+- 中途失敗會保留已驗證的成功幣別，後續只補缺少的部分。JCB 週末標示 `skipped`；工作日未提供資料仍會回報錯誤。
+- 手動執行 workflow 可選 `daily` 或 `backfill`（預設），執行報告保留為 artifact 14 天。抓取狀態以報告為準，workflow 綠色不代表所有來源都完整。
+
+每日資料沒有必要高頻輪詢。這組設定將短時間密集重試改為每日一次抓取與兩次缺漏回補機會，降低重複請求；它不是 VISA 保證可用的頻率，也無法保證不被防護系統阻擋。
 
 ## 資料說明
 
@@ -173,7 +188,7 @@ CLI 下次執行時會讀取新設定；已啟動的 API 需重新啟動。也�
 - VISA 查詢設定 `fee=0`，Mastercard 設定 `bank_fee=0`。JCB 使用 jcb.jp 公開 USD 基準頁，依 `TWD/外幣 = (TWD/USD sell) / (外幣/USD buy)` 估算；USD 分母為 1。
 - JPY／KRW 消費金額限整數，其他追蹤幣別最多兩位小數；金額須大於零，上限 10 億。
 - 歷史走勢的 7／30 天以日曆日計算，缺資料日不補造匯率，線段可能跨過缺資料日。
-- 每日抓取後嘗試回補近 7 天缺漏，JCB 回補略過週末。來源阻擋、假日或格式變更仍可能造成缺漏。
+- 每日分開時段抓取與回補近 7 天缺漏；JCB 週末略過，不以週五資料冒充週末匯率。來源阻擋、假日或格式變更仍可能造成缺漏。
 - JSON 以暫存檔原子替換，寫入中斷不截斷舊資料；空匯率集合不能覆蓋既有來源。
 
 ## 開發驗證

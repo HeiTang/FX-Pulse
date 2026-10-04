@@ -14,13 +14,18 @@ import time
 from datetime import UTC, datetime
 
 from curl_cffi import requests as cf_requests
-from fake_useragent import UserAgent
 
 from ..config import settings
 from .base import _IMPERSONATE_TARGETS, CloudflareBlockedError, _check_cloudflare
+from .retry import (
+    PermanentHTTPError,
+    RateLimitError,
+    check_http_status,
+    retry_after_seconds,
+    retry_delay,
+)
 
 logger = logging.getLogger(__name__)
-_ua = UserAgent()
 
 BASE_URL = "https://www.jcb.jp/rate/usd{date}.html"
 
@@ -46,7 +51,6 @@ class JcbScraper:
             self._session.headers.update(
                 {
                     "accept-language": "en-US,en;q=0.9",
-                    "user-agent": _ua.random,
                 }
             )
         return self._session
@@ -113,7 +117,9 @@ class JcbScraper:
         logger.info("[%s] Batch fetch | %04d-%02d | days=%s", self.source_name, year, month, days)
 
         result: dict[int, dict[str, dict[str, float]]] = {}
-        for day in days:
+        for index, day in enumerate(days):
+            if index:
+                time.sleep(random.uniform(settings.scraper_delay_min, settings.scraper_delay_max))
             d = datetime(year, month, day, tzinfo=UTC)
             try:
                 result[day] = self.fetch_all(date=d, currencies=currencies)
@@ -135,6 +141,7 @@ class JcbScraper:
         max_retries = settings.scraper_max_retries
 
         for attempt in range(max_retries):
+            resp = None
             try:
                 logger.info("[%s] GET %s", self.source_name, url)
                 resp = self.session.get(url, timeout=settings.scraper_timeout)
@@ -143,20 +150,26 @@ class JcbScraper:
                     raise NoRatesError(f"[{self.source_name}] No rates for {date.date()} (404)")
 
                 _check_cloudflare(resp)
+                check_http_status(resp)
                 resp.raise_for_status()
                 raw = self._parse_html(resp.text)
                 if not raw:
                     raise ValueError("JCB response contains no rate table")
                 return raw
 
-            except (ValueError, CloudflareBlockedError):
+            except (ValueError, CloudflareBlockedError, PermanentHTTPError):
                 raise  # 404 / CF block — don't retry
             except Exception as exc:
                 if attempt == max_retries - 1:
+                    if resp is not None and resp.status_code == 429:
+                        raise RateLimitError(
+                            "HTTP 429: retry budget exhausted",
+                            retry_after_seconds=retry_after_seconds(resp),
+                        ) from exc
                     raise RuntimeError(
                         f"[{self.source_name}] Failed to fetch {url} after {max_retries} attempts"
                     ) from exc
-                delay = random.uniform(0, min(settings.scraper_backoff_cap, 2**attempt))
+                delay = retry_delay(attempt, resp)
                 logger.warning(
                     "[%s] attempt %d/%d failed: %s — retry in %.1fs",
                     self.source_name,

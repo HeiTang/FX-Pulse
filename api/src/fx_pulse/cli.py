@@ -5,7 +5,9 @@ from __future__ import annotations
 import calendar
 import json
 import logging
+import random
 import sys
+import time
 from collections import defaultdict
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -13,10 +15,13 @@ from typing import Any
 
 import click
 
+from .config import settings
 from .models.rate import CurrencyRate
-from .scraper.base import CloudflareBlockedError
+from .scraper.base import BatchFetchError, CloudflareBlockedError
+from .scraper.cooldown import Cooldowns
 from .scraper.jcb import JcbScraper
 from .scraper.mastercard import MastercardScraper
+from .scraper.retry import PermanentHTTPError, RateLimitError
 from .scraper.visa import VisaScraper
 from .store import get_store
 
@@ -131,58 +136,105 @@ def _print_rates(date_key: str, source: str, rates: dict[str, CurrencyRate]) -> 
         click.echo(f"  {currency}/TWD  rate={rate_str}  reverse={r.reverse:.6f}")
 
 
-def _run_jcb_batch(
-    scraper: JcbScraper,
+def _run_dates(
+    scraper: Any,
     dates: list[datetime],
     *,
     dry_run: bool,
     store: Any,
+    missing_only: bool = False,
 ) -> dict[str, Any]:
-    """Run JCB scraper grouped by month (one sequential request per day).
-
-    Returns a scraper result dict compatible with the --result-file format.
-    """
-    by_month: dict[tuple[int, int], list[int]] = defaultdict(list)
-    for d in dates:
-        by_month[(d.year, d.month)].append(d.day)
-
+    """Save each date independently and preserve successful parts of a failed batch."""
+    cooldowns = Cooldowns()
+    active = cooldowns.active(scraper.source_name)
+    eligible = any(scraper.source_name != "JCB" or d.weekday() < 5 for d in dates)
+    if active and eligible:
+        return {
+            "status": "blocked",
+            "currencies": 0,
+            "cooldown_active": True,
+            "consecutive_blocks": active.consecutive_blocks,
+            "next_retry_at": active.next_retry_at.isoformat(),
+            "error": f"Cooling down until {active.next_retry_at.isoformat()}; no request made",
+        }
+    cooldown_entry = None
     currencies_fetched = 0
-    last_error: str | None = None
-
-    for (year, month), days in sorted(by_month.items()):
+    errors: list[str] = []
+    blocked = False
+    attempted = False
+    skipped = 0
+    for d in dates:
+        date_key = d.strftime("%Y-%m-%d")
+        if scraper.source_name == "JCB" and d.weekday() >= 5:
+            skipped += 1
+            continue
+        raw: dict[str, dict[str, float]] = {}
+        failure: Exception | None = None
         try:
-            month_rates = scraper.fetch_month(year, month, days)
-            for day, raw in month_rates.items():
-                date_key = f"{year:04d}-{month:02d}-{day:02d}"
+            if missing_only:
+                existing = (
+                    store.export_payload().rates.get(date_key, {}).get(scraper.source_name, {})
+                )
+                currencies = [c for c in settings.currencies if c not in existing]
+                if not currencies:
+                    continue
+            if attempted:
+                time.sleep(random.uniform(settings.scraper_delay_min, settings.scraper_delay_max))
+            attempted = True
+            raw = (
+                scraper.fetch_all(d, currencies=currencies)
+                if missing_only
+                else scraper.fetch_all(d)
+            )
+        except BatchFetchError as exc:
+            raw, failure = exc.rates, exc.cause
+        except Exception as exc:
+            failure = exc
+
+        try:
+            if raw:
                 rates = {c: CurrencyRate(**v) for c, v in raw.items()}
-                currencies_fetched = max(currencies_fetched, len(raw))
                 if dry_run:
                     _print_rates(date_key, scraper.source_name, rates)
                 else:
                     store.upsert_rates(date_key, scraper.source_name, rates)
-        except CloudflareBlockedError as exc:
-            return {
-                "status": "blocked",
-                "currencies": currencies_fetched,
-                "error": str(exc),
-            }
+                currencies_fetched = max(currencies_fetched, len(rates))
+            if failure is None:
+                expected = currencies if missing_only else settings.currencies
+                # All real scrapers should return the requested set, including JCB's parsed table.
+                if set(expected) - raw.keys():
+                    failure = ValueError("Source returned an incomplete currency set")
         except Exception as exc:
-            last_error = str(exc)
-            log.exception(
-                "Scraper %s failed for %04d-%02d",
-                scraper.source_name,
-                year,
-                month,
-            )
+            errors.append(f"{date_key}: could not save rates: {exc}")
+        if failure is not None:
+            errors.append(f"{date_key}: {failure}")
+            log.warning("%s: %s", scraper.source_name, errors[-1])
+            if isinstance(failure, (CloudflareBlockedError, RateLimitError)):
+                blocked = True
+                if not dry_run:
+                    cooldown_entry = cooldowns.block(
+                        scraper.source_name, failure.retry_after_seconds
+                    )
+                break
+            if isinstance(failure, PermanentHTTPError):
+                break
 
-    if last_error:
-        return {
-            "status": "error",
-            "currencies": currencies_fetched,
-            "error": last_error,
-            "partial_success": currencies_fetched > 0,
-        }
-    return {"status": "ok", "currencies": currencies_fetched}
+    if attempted and not errors and not dry_run:
+        cooldowns.success(scraper.source_name)
+    if errors:
+        status = "blocked" if blocked else "error"
+    else:
+        status = "ok" if attempted else "skipped"
+    result: dict[str, Any] = {"status": status, "currencies": currencies_fetched}
+    if errors:
+        result.update(error="; ".join(errors), partial_success=currencies_fetched > 0)
+    if cooldown_entry:
+        result["consecutive_blocks"] = cooldown_entry.consecutive_blocks
+        result["next_retry_at"] = cooldown_entry.next_retry_at.isoformat()
+    if skipped:
+        result["skipped_dates"] = skipped
+        result["note"] = "JCB weekend dates are not requested; no previous-day rates substituted"
+    return result
 
 
 @click.command()
@@ -215,12 +267,9 @@ def main(
     dates = _resolve_dates(target_date, target_month, date_from, date_to)
     scrapers = _resolve_scrapers(source)
     store = get_store()
-    multi_day = len(dates) > 1
 
     # Override delay if specified
     if delay is not None:
-        from .config import settings
-
         settings.scraper_delay_min = delay
         settings.scraper_delay_max = delay
 
@@ -236,66 +285,13 @@ def main(
     scraper_results: dict[str, dict[str, Any]] = {}
 
     for scraper in scrapers:
-        # JCB optimization: batch by month when fetching multiple days
-        if isinstance(scraper, JcbScraper) and multi_day:
-            scraper_results[scraper.source_name] = _run_jcb_batch(
-                scraper, dates, dry_run=dry_run, store=store
-            )
-            continue
-
-        currencies_fetched = 0
-        last_error: str | None = None
-        cf_blocked = False
-
-        for d in dates:
-            date_key = d.strftime("%Y-%m-%d")
-            try:
-                raw = scraper.fetch_all(d)
-                rates = {c: CurrencyRate(**v) for c, v in raw.items()}
-                currencies_fetched = max(currencies_fetched, len(raw))
-                if dry_run:
-                    _print_rates(date_key, scraper.source_name, rates)
-                else:
-                    store.upsert_rates(date_key, scraper.source_name, rates)
-            except CloudflareBlockedError as exc:
-                cf_blocked = True
-                last_error = str(exc)
-                log.error(
-                    "Scraper %s blocked by Cloudflare for %s",
-                    scraper.source_name,
-                    date_key,
-                )
-                break  # no point retrying other dates if CF is blocking
-            except Exception as exc:
-                last_error = str(exc)
-                log.exception(
-                    "Scraper %s failed for %s — continuing",
-                    scraper.source_name,
-                    date_key,
-                )
-
-        if cf_blocked:
-            scraper_results[scraper.source_name] = {
-                "status": "blocked",
-                "currencies": currencies_fetched,
-                "error": last_error,
-            }
-        elif last_error:
-            scraper_results[scraper.source_name] = {
-                "status": "error",
-                "currencies": currencies_fetched,
-                "error": last_error,
-                "partial_success": currencies_fetched > 0,
-            }
-        else:
-            scraper_results[scraper.source_name] = {
-                "status": "ok",
-                "currencies": currencies_fetched,
-            }
+        scraper_results[scraper.source_name] = _run_dates(
+            scraper, dates, dry_run=dry_run, store=store
+        )
 
     if result_file:
         statuses = {r["status"] for r in scraper_results.values()}
-        if statuses == {"ok"}:
+        if statuses <= {"ok", "skipped"}:
             overall = "ok"
         elif "blocked" in statuses and not statuses & {"error"}:
             overall = "blocked"
@@ -349,13 +345,32 @@ def backfill(
 
     missing = store.find_missing(source_names, days=days)
 
+    def missing_currency_count(pairs: list[tuple[str, str]]) -> int:
+        payload = store.export_payload()
+        return sum(
+            len(set(settings.currencies) - payload.rates.get(day, {}).get(src, {}).keys())
+            for day, src in pairs
+        )
+
+    currencies_missing_before = missing_currency_count(missing)
+
     if not missing:
         log.info("Backfill: nothing missing in the last %d days.", days)
         if result_file:
             result_path = Path(result_file)
             try:
                 result_path.parent.mkdir(parents=True, exist_ok=True)
-                result_path.write_text(json.dumps({"status": "ok", "missing_found": 0}))
+                result_path.write_text(
+                    json.dumps(
+                        {
+                            "status": "ok",
+                            "missing_found": 0,
+                            "missing_remaining": 0,
+                            "currencies_recovered": 0,
+                            "currencies_remaining": 0,
+                        }
+                    )
+                )
             except OSError:
                 log.exception("Failed to write result summary file to %s", result_path)
         return
@@ -399,48 +414,13 @@ def backfill(
 
         log.info("Backfill: scraping %s for %d date(s): %s", src, len(dates_dt), sorted_date_keys)
 
-        if isinstance(scraper, JcbScraper) and len(dates_dt) > 1:
-            scraper_results[src] = _run_jcb_batch(scraper, dates_dt, dry_run=False, store=store)
-        else:
-            currencies_fetched = 0
-            last_error: str | None = None
-            cf_blocked = False
-
-            for d in dates_dt:
-                date_key = d.strftime("%Y-%m-%d")
-                try:
-                    raw = scraper.fetch_all(d)
-                    rates = {c: CurrencyRate(**v) for c, v in raw.items()}
-                    currencies_fetched = max(currencies_fetched, len(raw))
-                    store.upsert_rates(date_key, scraper.source_name, rates)
-                except CloudflareBlockedError as exc:
-                    cf_blocked = True
-                    last_error = str(exc)
-                    log.error("Backfill: %s blocked by Cloudflare for %s", src, date_key)
-                    break
-                except Exception as exc:
-                    last_error = str(exc)
-                    log.exception("Backfill: %s failed for %s — continuing", src, date_key)
-
-            if cf_blocked:
-                scraper_results[src] = {
-                    "status": "blocked",
-                    "currencies": currencies_fetched,
-                    "error": last_error,
-                }
-            elif last_error:
-                scraper_results[src] = {
-                    "status": "error",
-                    "currencies": currencies_fetched,
-                    "error": last_error,
-                    "partial_success": currencies_fetched > 0,
-                }
-            else:
-                scraper_results[src] = {"status": "ok", "currencies": currencies_fetched}
+        scraper_results[src] = _run_dates(
+            scraper, dates_dt, dry_run=False, store=store, missing_only=True
+        )
 
     if result_file:
         statuses = {r["status"] for r in scraper_results.values()}
-        if statuses <= {"ok"}:
+        if statuses <= {"ok", "skipped"}:
             overall = "ok"
         elif "blocked" in statuses and "error" not in statuses:
             overall = "blocked"
@@ -451,7 +431,16 @@ def backfill(
             result_path.parent.mkdir(parents=True, exist_ok=True)
             result_path.write_text(
                 json.dumps(
-                    {"status": overall, "missing_found": len(missing), "results": scraper_results},
+                    {
+                        "date": datetime.now(UTC).date().isoformat(),
+                        "status": overall,
+                        "missing_found": len(missing),
+                        "missing_remaining": len(store.find_missing(source_names, days=days)),
+                        "currencies_recovered": currencies_missing_before
+                        - missing_currency_count(missing),
+                        "currencies_remaining": missing_currency_count(missing),
+                        "results": scraper_results,
+                    },
                     indent=2,
                 )
             )

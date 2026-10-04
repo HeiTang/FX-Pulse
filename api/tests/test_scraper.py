@@ -68,11 +68,15 @@ class TestVisaScraperParams:
 
 
 class TestFetchOneRetry:
+    @pytest.fixture(autouse=True)
+    def isolate_session(self, monkeypatch):
+        self.monkeypatch = monkeypatch
+
     def _make_scraper_with_mock_session(self) -> tuple[VisaScraper, MagicMock]:
         scraper = VisaScraper()
         mock_session = MagicMock()
         # Patch the property so _session = None resets don't break the mock
-        type(scraper).session = PropertyMock(return_value=mock_session)
+        self.monkeypatch.setattr(type(scraper), "session", PropertyMock(return_value=mock_session))
         return scraper, mock_session
 
     def test_fetch_one_retries_on_failure(self):

@@ -120,13 +120,15 @@ def _build_daily_payload(
             }
         )
 
-    failed = [s for s, r in results.items() if r["status"] != "ok"]
+    failed = [s for s, r in results.items() if r["status"] not in ("ok", "skipped")]
     color = COLOR_GREEN if not failed else COLOR_YELLOW
 
     status_parts = []
     for src, res in results.items():
         if res["status"] == "ok":
             status_parts.append(f"✅ {src}")
+        elif res["status"] == "skipped":
+            status_parts.append(f"➖ {src}（週末略過）")
         else:
             status_parts.append(f"❌ {src}")
 
@@ -155,20 +157,25 @@ def _build_alert_payload(
         status = res["status"]
         if status == "ok":
             lines.append(f"✅ **{src}** — {res['currencies']} 幣別正常")
+        elif status == "skipped":
+            lines.append(f"➖ **{src}** — 週末略過")
+        elif status == "blocked" and res.get("cooldown_active"):
+            has_blocked = True
+            lines.append(f"🕒 **{src}** — 冷卻中，下次可重試：{res['next_retry_at']}")
         elif status == "blocked":
             has_blocked = True
             error = res.get("error", "unknown")
             sanitized = error.replace("@", "＠")
-            lines.append(f"🛡️ **{src}** — Cloudflare 阻擋 · {sanitized}")
+            lines.append(f"🛡️ **{src}** — 來源阻擋／限流 · {sanitized}")
         else:
             error = res.get("error", "unknown error")
             sanitized = error.replace("@", "＠")
             lines.append(f"❌ **{src}** — {sanitized}")
 
-    all_blocked = all(r["status"] in ("ok", "blocked") for r in results.values())
+    all_blocked = all(r["status"] in ("ok", "skipped", "blocked") for r in results.values())
     color = COLOR_YELLOW if all_blocked else COLOR_RED
     title = (
-        f"🛡️ FX Pulse 遭 Cloudflare 阻擋 · {date_key}"
+        f"🛡️ FX Pulse 遭 來源阻擋／限流 · {date_key}"
         if all_blocked and has_blocked
         else f"🚨 FX Pulse 爬蟲失敗 · {date_key}"
     )

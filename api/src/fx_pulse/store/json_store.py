@@ -60,7 +60,7 @@ class JsonStore(BaseStore):
             raise ValueError("Cannot store an empty source or rate set")
         payload = self._load()
         payload.rates.setdefault(date_key, {})
-        payload.rates[date_key][source] = rates
+        payload.rates[date_key].setdefault(source, {}).update(rates)
         payload.meta.last_updated = datetime.now(UTC).isoformat()
         self._save(payload)
 

@@ -14,6 +14,13 @@ from fx_pulse.scraper.mastercard import MastercardScraper
 from fx_pulse.scraper.visa import VisaScraper
 
 
+@pytest.fixture(autouse=True)
+def configured_currency(monkeypatch):
+    # Single-currency CLI fixtures represent a complete configured batch.
+    monkeypatch.setattr("fx_pulse.cli.settings.currencies", ["USD"])
+    monkeypatch.setattr("fx_pulse.cli.time.sleep", lambda _: None)
+
+
 class TestResolveScrapers:
     def test_default_returns_all_three(self):
         scrapers = _resolve_scrapers(None)
