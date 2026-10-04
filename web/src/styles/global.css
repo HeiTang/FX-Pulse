@@ -375,9 +375,6 @@ h2 {
   background: transparent;
   padding: 8px 13px;
 }
-.segmented button:last-child {
-  border-right: 0;
-}
 .source-filters {
   display: flex;
   flex-wrap: wrap;
@@ -475,9 +472,6 @@ details[open] summary:after {
     width: 100%;
     max-width: 140px;
   }
-  .currency-shortcuts {
-    padding: 10px 12px 0;
-  }
   .amount-wrap {
     min-height: 58px;
   }
@@ -487,45 +481,16 @@ details[open] summary:after {
   .comparison-heading {
     margin-bottom: 10px;
   }
-  h2 {
-    font-size: 15px;
-  }
-  .result-row {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
-    grid-template-areas: 'source total' 'rate difference';
-    row-gap: 7px;
-    column-gap: 6px;
-    min-height: 78px;
-  }
-  .result-rate {
-    white-space: nowrap;
-  }
-  .best-badge {
-    padding: 3px 6px;
-  }
-  .history-panel {
-    padding-top: 16px;
-  }
-  .history-toolbar {
-    gap: 8px;
-  }
   #chart-title {
     display: block;
     margin: 3px 0 0;
-    font-size: 11px;
   }
   .segmented button {
     min-width: 45px;
     padding: 7px 9px;
   }
-  #chart {
-    height: 235px;
-  }
   .chart-placeholder {
     height: 235px;
-  }
-  summary span {
-    font-size: 10px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -835,9 +800,6 @@ summary span {
   .route-destination > span:last-child {
     font-size: 15px;
   }
-  .currency-shortcuts button {
-    flex-basis: 67px;
-  }
   .currency-shortcuts span {
     display: none;
   }
@@ -861,10 +823,6 @@ summary span {
   }
   #date-trigger {
     min-height: 46px;
-  }
-  .amount-field {
-    grid-row: auto;
-    grid-column: auto;
   }
   .table-head {
     display: none;
@@ -1043,9 +1001,6 @@ summary span {
   border-radius: 14px;
 }
 .source-filters button {
-  border-radius: 14px;
-}
-.source-filters button[aria-pressed='true'] {
   border-radius: 14px;
 }
 .currency-card {
@@ -1259,9 +1214,6 @@ main.shell {
 }
 .github-link:hover {
   background: #1c2532;
-}
-.result-source {
-  flex-wrap: nowrap;
 }
 .source-icon {
   display: grid;
