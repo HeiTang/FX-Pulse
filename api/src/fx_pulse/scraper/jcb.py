@@ -99,36 +99,6 @@ class JcbScraper:
         logger.info("[%s] Fetch complete | %d currencies", self.source_name, len(result))
         return result
 
-    def fetch_month(
-        self,
-        year: int,
-        month: int,
-        days: list[int],
-        currencies: list[str] | None = None,
-    ) -> dict[int, dict[str, dict[str, float]]]:
-        """Fetch rates for multiple days in a month, one request per day.
-
-        Returns: {1: {"USD": {"rate": ..., "reverse": ...}}, ...}
-        Days with no data (404 / weekend) are omitted from the result.
-        """
-        if currencies is None:
-            currencies = settings.currencies
-
-        logger.info("[%s] Batch fetch | %04d-%02d | days=%s", self.source_name, year, month, days)
-
-        result: dict[int, dict[str, dict[str, float]]] = {}
-        for index, day in enumerate(days):
-            if index:
-                time.sleep(random.uniform(settings.scraper_delay_min, settings.scraper_delay_max))
-            d = datetime(year, month, day, tzinfo=UTC)
-            try:
-                result[day] = self.fetch_all(date=d, currencies=currencies)
-            except NoRatesError as exc:
-                logger.warning("[%s] Day %d skipped: %s", self.source_name, day, exc)
-
-        logger.info("[%s] Batch complete | %d days", self.source_name, len(result))
-        return result
-
     # ── Internal ──────────────────────────────────────────────────────────────
 
     def _fetch_raw_rates(self, date: datetime) -> dict[str, dict[str, float]]:

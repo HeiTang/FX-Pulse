@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
@@ -9,7 +10,7 @@ import pytest
 from click.testing import CliRunner
 
 from fx_pulse.cli import _resolve_dates, _resolve_scrapers, backfill, main
-from fx_pulse.scraper.jcb import JcbScraper
+from fx_pulse.scraper.jcb import JcbScraper, NoRatesError
 from fx_pulse.scraper.mastercard import MastercardScraper
 from fx_pulse.scraper.visa import VisaScraper
 
@@ -278,20 +279,45 @@ class TestBackfillCommand:
         assert result.exit_code != 0
 
 
-class TestJcbFetchMonth:
-    def test_extracts_multiple_days(self):
-        scraper = JcbScraper()
+@pytest.mark.parametrize("failure", [None, NoRatesError("404"), ValueError("malformed table")])
+def test_jcb_month_cli_preserves_weekday_data_and_reports_failures(failure, tmp_path):
+    from fx_pulse.store.json_store import JsonStore
 
-        def mock_fetch_all(date, currencies):
-            return {"JPY": {"rate": 0.199 + date.day * 0.001, "reverse": 5.0}}
+    store = JsonStore(tmp_path / "rates.json")
+    report_path = tmp_path / "report.json"
 
-        with patch.object(scraper, "fetch_all", side_effect=mock_fetch_all):
-            result = scraper.fetch_month(2026, 4, [1, 2, 16], currencies=["JPY"])
+    def fetch_day(date):
+        if date.day == 15 and failure is not None:
+            raise failure
+        return {"USD": {"rate": 30 + date.day, "reverse": 1 / (30 + date.day)}}
 
-        assert set(result.keys()) == {1, 2, 16}
-        assert result[1]["JPY"]["rate"] == pytest.approx(0.200)
-        assert result[2]["JPY"]["rate"] == pytest.approx(0.201)
-        assert result[16]["JPY"]["rate"] == pytest.approx(0.215)
+    with (
+        patch("fx_pulse.cli.get_store", return_value=store),
+        patch.object(JcbScraper, "fetch_all", side_effect=fetch_day) as fetch,
+    ):
+        result = CliRunner().invoke(
+            main, ["--source", "JCB", "--month", "2026-04", "--result-file", str(report_path)]
+        )
+
+    assert result.exit_code == 0, result.output
+    weekdays = [
+        datetime(2026, 4, day, tzinfo=UTC)
+        for day in range(1, 31)
+        if datetime(2026, 4, day).weekday() < 5
+    ]
+    assert [call.args[0] for call in fetch.call_args_list] == weekdays
+    saved = store.export_payload().rates
+    assert set(saved) == {
+        date.date().isoformat() for date in weekdays if date.day != 15 or failure is None
+    }
+    assert saved["2026-04-30"]["JCB"]["USD"].rate == 60
+    report = json.loads(report_path.read_text())
+    assert report["window"] == {"from": "2026-04-01", "to": "2026-04-30"}
+    assert report["status"] == ("error" if failure else "ok")
+    assert report["results"]["JCB"]["currencies_saved"] == len(saved)
+    if failure:
+        assert report["results"]["JCB"]["partial_success"] is True
+        assert str(failure) in report["results"]["JCB"]["error"]
 
 
 @pytest.mark.parametrize(
