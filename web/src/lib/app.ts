@@ -315,7 +315,16 @@ document
       render();
     }),
   );
+let swapAnimations: Animation[] = [];
+function cancelSwapAnimations() {
+  swapAnimations.forEach((animation) => animation.cancel());
+  swapAnimations = [];
+}
+reducedMotion.addEventListener('change', () => {
+  if (reducedMotion.matches) cancelSwapAnimations();
+});
 swap.addEventListener('click', () => {
+  cancelSwapAnimations();
   reverse = !reverse;
   board.replaceChildren(
     reverse ? twdRoute : foreignRoute,
@@ -326,6 +335,42 @@ swap.addEventListener('click', () => {
   swap.setAttribute('aria-pressed', String(reverse));
   render();
   swap.focus({ preventScroll: true });
+  if (reducedMotion.matches) return;
+  const timing = { duration: 240, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)' };
+  const left = reverse ? twdRoute : foreignRoute;
+  const right = reverse ? foreignRoute : twdRoute;
+  swapAnimations = [
+    left.animate(
+      [
+        { transform: 'translateX(18px)', opacity: 0.35 },
+        { transform: 'translateX(0)', opacity: 1 },
+      ],
+      timing,
+    ),
+    right.animate(
+      [
+        { transform: 'translateX(-18px)', opacity: 0.35 },
+        { transform: 'translateX(0)', opacity: 1 },
+      ],
+      timing,
+    ),
+    swap
+      .querySelector('span')!
+      .animate(
+        [
+          { transform: `rotate(${reverse ? -180 : 180}deg)` },
+          { transform: 'rotate(0deg)' },
+        ],
+        timing,
+      ),
+    results.animate(
+      [
+        { transform: 'translateY(4px)', opacity: 0.55 },
+        { transform: 'translateY(0)', opacity: 1 },
+      ],
+      { ...timing, duration: 180 },
+    ),
+  ];
 });
 currency.addEventListener('change', render);
 amount.addEventListener('input', renderResults);
