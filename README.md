@@ -1,15 +1,37 @@
-# FX Pulse — 匯率脈動
+<div align="center">
+	<h1>FX Pulse — 匯率脈動</h1>
+	<p align="center">
+		<img src="https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.12" />
+		<img src="https://img.shields.io/badge/Astro-7-FF5D01?style=flat-square&logo=astro&logoColor=white" alt="Astro 7" />
+		<img src="https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white" alt="Tailwind CSS v4" />
+		<img src="https://img.shields.io/badge/GitHub_Actions-自動更新-2088FF?style=flat-square&logo=githubactions&logoColor=white" alt="GitHub Actions" />
+	</p>
+</div>
 
-比較 VISA、Mastercard、JCB 的外幣參考匯率，試算消費金額換算為新台幣的結果。
+<div align="center">
+	<p><strong>每日自動收集 VISA、Mastercard 匯率與 JCB 交叉匯率估算，快速比較外幣消費的台幣換算金額。</strong></p>
+	<p>透過 Astro 靜態網頁試算消費金額與查看歷史走勢，搭配 GitHub Actions 排程更新。</p>
+</div>
 
-## 功能與資料
+---
 
-- 選擇消費幣別、金額及匯率日期，並列三家換算額與相對最低值的差額。
-- 支援 USD、JPY、EUR、GBP、HKD、AUD、KRW、SGD；JPY／KRW 限整數，其他追蹤幣別最多兩位小數。金額須大於零，上限 10 億。
-- 行動版提供幣別捷徑、大字金額、可展開的幣別總覽；日期日曆只允許選取有資料的日期。
-- ECharts 顯示截至所選日期的 7 個日曆日、30 個日曆日或全部歷史，可切換來源。缺資料日不補造匯率，連線可能跨過缺資料日。
-- 網頁使用 `web/src/data/rates.json` 的已儲存資料建置，不會在開啟頁面時即時查詢。匯率日期與檔案最後寫入時間分開顯示；某日缺少來源就顯示無資料，不混用其他日期。
-- 每日 GitHub Actions 抓取並回補近 7 天缺漏；來源阻擋、假日或格式變更仍可能造成缺漏。JCB 回補略過週末。
+## ✨ 功能亮點
+
+- **三來源同步比較**：同一幣別、同一天，並列 VISA、Mastercard、JCB 的換算台幣金額與差額，最低換算額自動標示；缺少來源就顯示無資料，不混用其他日期。
+
+- **消費金額試算**：支援 USD、JPY、EUR、GBP、HKD、AUD、KRW、SGD。JPY／KRW 限整數，其他追蹤幣別最多兩位小數；金額須大於零，上限 10 億。
+
+- **手機操作優先**：幣別國旗捷徑、大字金額與可展開的幣別總覽；自訂日期日曆只允許選取有資料的日期。
+
+- **JCB Cross-Rate 解析**：從 jcb.jp 每日公開費率頁取得 USD 基準匯率，以 `TWD/外幣 = (TWD/USD sell) / (外幣/USD buy)` 估算，支援全 8 幣別；USD 分母為 1。
+
+- **互動走勢圖**：ECharts 顯示截至所選日期的 7 個日曆日、30 個日曆日或全部歷史，可切換幣別與來源；缺資料日不補造匯率，線段可能跨過缺資料日。
+
+- **自動回補缺漏**：GitHub Actions 每日抓取後，掃描近 7 天缺漏的「日期＋來源」並嘗試回補；JCB 週末自動略過。來源阻擋、假日或格式變更仍可能造成缺漏。
+
+- **彈性 CLI 與狀態回報**：可指定來源、日期、區間、月份，支援 dry-run 與結果報告；JCB 月份抓取採逐日循序請求。請求失敗有限重試，Cloudflare 阻擋會停止該來源。
+
+- **靜態網站架構**：Astro 讀取 `rates.json` 建置，透過 GitHub Pages 託管，無需常駐 API 伺服器。匯率日期與資料檔最後寫入時間分開顯示，開啟頁面時不會即時查詢外部匯率。
 
 本專案為非官方工具。**換算額未計銀行手續費、回饋及實際入帳日期，不能視為實際帳單或信用卡推薦。** VISA 查詢設定 `fee=0`；Mastercard 設定 `bank_fee=0`。JCB 使用 jcb.jp 公開 USD 基準頁，依 `TWD/外幣 = (TWD/USD sell) / (外幣/USD buy)` 估算；USD 分母為 1。
 
