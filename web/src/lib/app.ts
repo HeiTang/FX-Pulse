@@ -9,6 +9,7 @@ import {
   historyDates,
   rateEntries,
   validRate,
+  validDate,
   conversionRate,
   validateAmount,
   type Source,
@@ -19,8 +20,6 @@ const dates = availableDates(rateDays);
 const currency = document.querySelector<HTMLSelectElement>('#currency')!;
 const amount = document.querySelector<HTMLInputElement>('#amount')!;
 const rateDate = document.querySelector<HTMLInputElement>('#rate-date')!;
-let selectedDate = rateDate.value;
-mountDatePicker(rateDate, dates);
 const results = document.querySelector<HTMLElement>('#results')!;
 const chartEl = document.querySelector<HTMLElement>('#chart')!;
 const params = new URLSearchParams(location.search);
@@ -31,11 +30,50 @@ if (
 )
   currency.value = params.get('currency')!;
 if (params.has('amount')) amount.value = params.get('amount')!;
-let reverse = false;
+const requestedDate = params.get('date');
+if (requestedDate !== null) {
+  if (validDate(requestedDate)) {
+    rateDate.value = requestedDate;
+    if (!dates.includes(requestedDate))
+      document.querySelector<HTMLElement>('#date-error')!.textContent =
+        '此日期無資料';
+  } else {
+    document.querySelector<HTMLElement>('#date-error')!.textContent =
+      '連結日期無效，請使用 YYYY-MM-DD。';
+  }
+}
+let selectedDate = rateDate.value;
+mountDatePicker(rateDate, dates);
+let reverse = params.get('direction') === 'twd-to-foreign';
+const queryErrors: string[] = [];
+if (
+  params.has('currency') &&
+  !Array.from(currency.options).some(
+    (option) => option.value === params.get('currency'),
+  )
+)
+  queryErrors.push('連結幣別不支援，已使用預設幣別。');
+if (
+  params.has('direction') &&
+  !['foreign-to-twd', 'twd-to-foreign'].includes(params.get('direction')!)
+)
+  queryErrors.push('連結換算方向無效，已使用預設方向。');
+document.querySelector<HTMLElement>('#query-message')!.textContent =
+  queryErrors.join(' ');
 const swap = document.querySelector<HTMLButtonElement>('#swap-direction')!;
 const board = document.querySelector<HTMLElement>('.route-board')!;
 const foreignRoute = document.querySelector<HTMLElement>('.currency-field')!;
 const twdRoute = document.querySelector<HTMLElement>('.route-destination')!;
+function syncDirection() {
+  board.replaceChildren(
+    reverse ? twdRoute : foreignRoute,
+    swap,
+    reverse ? foreignRoute : twdRoute,
+  );
+  board.classList.toggle('is-reversed', reverse);
+  swap.setAttribute('aria-pressed', String(reverse));
+}
+syncDirection();
 const inputCode = () => (reverse ? 'TWD' : currency.value);
 let range: '7' | '30' | 'all' = '7';
 let source: Source | 'all' = 'all';
@@ -58,7 +96,19 @@ const amountError = () => validateAmount(amount.value, inputCode()).error;
 const validAmount = () => validateAmount(amount.value, inputCode()).value;
 const entries = (code: string, day: string) =>
   rateEntries(rateDays, code, day, reverse);
+function syncQuery() {
+  const url = new URL(location.href);
+  url.searchParams.set('currency', currency.value);
+  url.searchParams.set('amount', amount.value);
+  url.searchParams.set('date', rateDate.value);
+  url.searchParams.set(
+    'direction',
+    reverse ? 'twd-to-foreign' : 'foreign-to-twd',
+  );
+  if (url.href !== location.href) history.replaceState(history.state, '', url);
+}
 function renderResults() {
+  syncQuery();
   const code = currency.value;
   const value = validAmount();
   const available = entries(code, rateDate.value);
@@ -113,19 +163,30 @@ function renderResults() {
     const name = document.createElement('strong');
     name.textContent = src;
     label.append(icon, name);
+    if (src === 'JCB') {
+      const estimate = document.createElement('span');
+      estimate.className = 'source-estimate';
+      estimate.textContent = '交叉匯率估算';
+      label.append(estimate);
+    }
     const rateCell = document.createElement('div');
     rateCell.className = 'result-rate';
     const rateNumber = document.createElement('span');
     rateNumber.textContent =
       rate === undefined
-        ? '此日期無資料'
+        ? src === 'JCB' &&
+          [0, 6].includes(new Date(`${rateDate.value}T00:00:00Z`).getUTCDay())
+          ? '此日期無資料；目前抓取策略略過週末'
+          : '此日期無資料'
         : `1 ${from} = ${rateFormat(rate)} ${to}`;
     rateCell.append(rateNumber);
     const total = document.createElement('div');
     total.className = 'result-total';
     const totalNumber = document.createElement('strong');
     totalNumber.textContent =
-      converted === null ? '—' : `${unit(to)} ${formatMoney(converted, to)}`;
+      converted === null
+        ? '—'
+        : `${src === 'JCB' ? '約 ' : ''}${unit(to)} ${formatMoney(converted, to)}`;
     total.append(totalNumber);
     const difference = document.createElement('div');
     difference.className = 'result-difference';
@@ -140,8 +201,12 @@ function renderResults() {
         ? '—'
         : best
           ? reverse
-            ? '最高可換得金額'
-            : '最低換算額'
+            ? src === 'JCB'
+              ? '最高參考可換得金額（估算）'
+              : '最高可換得金額'
+            : src === 'JCB'
+              ? '最低參考換算額（估算）'
+              : '最低換算額'
           : gap === null || available.length < 2
             ? '無法比較'
             : gap < smallestUnit / 2
@@ -326,13 +391,7 @@ reducedMotion.addEventListener('change', () => {
 swap.addEventListener('click', () => {
   cancelSwapAnimations();
   reverse = !reverse;
-  board.replaceChildren(
-    reverse ? twdRoute : foreignRoute,
-    swap,
-    reverse ? foreignRoute : twdRoute,
-  );
-  board.classList.toggle('is-reversed', reverse);
-  swap.setAttribute('aria-pressed', String(reverse));
+  syncDirection();
   render();
   swap.focus({ preventScroll: true });
   if (reducedMotion.matches) return;

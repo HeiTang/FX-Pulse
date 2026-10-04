@@ -1325,3 +1325,21 @@ main.shell {
 .route-board.is-reversed .route-destination {
   text-align: left;
 }
+
+.source-estimate {
+  color: #a1aec1;
+  font-size: 11px;
+  font-weight: 400;
+}
+.result-source {
+  flex-wrap: wrap;
+}
+.query-message {
+  padding: 0 1rem;
+}
+#query-message:empty {
+  display: none;
+}
+.result-rate {
+  white-space: normal;
+}

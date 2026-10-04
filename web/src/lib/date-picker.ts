@@ -12,7 +12,14 @@ export function mountDatePicker(input: HTMLInputElement, dates: string[]) {
   }
   const firstMonth = dates[0].slice(0, 7);
   const lastMonth = dates.at(-1)!.slice(0, 7);
-  let month = input.value.slice(0, 7);
+  const pickerMonth = () =>
+    input.value.slice(0, 7) < firstMonth
+      ? firstMonth
+      : input.value.slice(0, 7) > lastMonth
+        ? lastMonth
+        : input.value.slice(0, 7);
+  let month = pickerMonth();
+  display.textContent = input.value.replaceAll('-', '/');
   const iso = (date: Date) => date.toISOString().slice(0, 10);
   const parse = (value: string) => new Date(`${value}T00:00:00Z`);
 
@@ -38,7 +45,7 @@ export function mountDatePicker(input: HTMLInputElement, dates: string[]) {
     start.setUTCDate(1 - first.getUTCDay());
     const focus =
       focusDate ??
-      (input.value.startsWith(month)
+      (available.has(input.value) && input.value.startsWith(month)
         ? input.value
         : dates.find((date) => date.startsWith(month)));
     for (let offset = 0; offset < 42; offset++) {
@@ -67,7 +74,7 @@ export function mountDatePicker(input: HTMLInputElement, dates: string[]) {
 
   trigger.addEventListener('click', () => {
     if (!panel.hidden) return close();
-    month = input.value.slice(0, 7);
+    month = pickerMonth();
     render();
     panel.hidden = false;
     trigger.setAttribute('aria-expanded', 'true');

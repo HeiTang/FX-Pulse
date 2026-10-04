@@ -52,6 +52,10 @@ npm run dev
 
 前端直接使用專案內的匯率資料，啟動網頁不需另外啟動 API。
 
+查詢條件會直接同步到網址的 Query，包含幣別、金額、日期與換算方向；複製瀏覽器網址即可分享。更新網址不重新載入頁面，也不增加瀏覽器歷史紀錄。金額保留目前輸入內容，包含無效值；結果依開啟時的資料重新計算。
+
+例如：`https://fx.purr.tw/?currency=JPY&amount=10000&date=2026-10-02&direction=foreign-to-twd`。反向換算使用 `direction=twd-to-foreign`。未提供參數時採用原有預設；指定日期無資料時保留日期並顯示缺漏，不切換到其他日期。
+
 ### 更新匯率資料
 
 需求：Python 3.12+、Poetry。另開終端機，在專案根目錄執行：
@@ -121,6 +125,16 @@ poetry run backfill-rates --days 7 --result-file backfill_result.json
 
 結果檔記錄整體與各來源的執行狀態、錯誤資訊；回補報告另記錄缺漏日期／來源組數（`missing_found`／`missing_remaining`）、補回與仍缺少的日期／來源／幣別筆數（`currencies_recovered`／`currencies_remaining`），以及冷卻來源的 `next_retry_at`（UTC）。這些報告與匯率資料分開儲存。自動化應檢查報告的 `status`，不要只依 CLI 退出碼判斷抓取成功。
 
+報告另含 `window`（`from`／`to`，UTC 日期）、`sources` 與各來源的 `currencies_saved`（本次成功保存的日期／幣別筆數；既有 `currencies` 欄位維持原本單日最大取得數）。GitHub Actions 執行摘要分開顯示本次狀態、保存數與區間資料完整度；回補採實際設定的回溯區間，JCB 週末不計入應有資料。
+
+可在 `api/` 手動查看相同摘要，不會抓取或修改匯率：
+
+```bash
+poetry run python scripts/summarize_scrape.py --result-file scrape_result.json
+```
+
+報告缺失或無效時，摘要明確標示無法確認，不把舊資料當成本次成功。
+
 ### 查看完整參數
 
 ```bash
@@ -171,7 +185,7 @@ CLI 下次執行時會讀取新設定；已啟動的 API 需重新啟動。也�
 
 ## 資料說明
 
-- 匯率每日更新，非即時報價；請以頁面標示的匯率日期為準。
+- 匯率每日更新，非即時報價；三家使用日期選擇器指定的同一天。頁尾「資料檔更新時間」代表整份檔案最後寫入時間，不代表三家都剛取得資料。
 - 換算金額未計銀行手續費與回饋，僅供參考，非實際帳單或銀行換匯報價；JCB 為交叉匯率估算。
 - 部分日期或來源可能缺少資料，網站不以其他日期的匯率替代。
 

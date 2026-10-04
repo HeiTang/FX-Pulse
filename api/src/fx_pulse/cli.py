@@ -152,6 +152,7 @@ def _run_dates(
         return {
             "status": "blocked",
             "currencies": 0,
+            "currencies_saved": 0,
             "cooldown_active": True,
             "consecutive_blocks": active.consecutive_blocks,
             "next_retry_at": active.next_retry_at.isoformat(),
@@ -159,6 +160,7 @@ def _run_dates(
         }
     cooldown_entry = None
     currencies_fetched = 0
+    currencies_saved = 0
     errors: list[str] = []
     blocked = False
     attempted = False
@@ -198,6 +200,7 @@ def _run_dates(
                     _print_rates(date_key, scraper.source_name, rates)
                 else:
                     store.upsert_rates(date_key, scraper.source_name, rates)
+                    currencies_saved += len(rates)
                 currencies_fetched = max(currencies_fetched, len(rates))
             if failure is None:
                 expected = currencies if missing_only else settings.currencies
@@ -225,7 +228,11 @@ def _run_dates(
         status = "blocked" if blocked else "error"
     else:
         status = "ok" if attempted else "skipped"
-    result: dict[str, Any] = {"status": status, "currencies": currencies_fetched}
+    result: dict[str, Any] = {
+        "status": status,
+        "currencies": currencies_fetched,
+        "currencies_saved": currencies_saved,
+    }
     if errors:
         result.update(error="; ".join(errors), partial_success=currencies_fetched > 0)
     if cooldown_entry:
@@ -301,6 +308,8 @@ def main(
             "date": dates[-1].strftime("%Y-%m-%d"),
             "status": overall,
             "results": scraper_results,
+            "window": {"from": dates[0].date().isoformat(), "to": dates[-1].date().isoformat()},
+            "sources": [scraper.source_name for scraper in scrapers],
         }
         result_path = Path(result_file)
         try:
@@ -343,6 +352,16 @@ def backfill(
             source_names.append(s.source_name)
     store = get_store()
 
+    report_end = datetime.now(UTC).date()
+    report_context = {
+        "date": report_end.isoformat(),
+        "window": {
+            "from": (report_end - timedelta(days=days - 1)).isoformat(),
+            "to": report_end.isoformat(),
+        },
+        "sources": source_names,
+        "mode": "backfill",
+    }
     missing = store.find_missing(source_names, days=days)
 
     def missing_currency_count(pairs: list[tuple[str, str]]) -> int:
@@ -363,6 +382,8 @@ def backfill(
                 result_path.write_text(
                     json.dumps(
                         {
+                            **report_context,
+                            "results": {},
                             "status": "ok",
                             "missing_found": 0,
                             "missing_remaining": 0,
@@ -388,6 +409,7 @@ def backfill(
                 result_path.write_text(
                     json.dumps(
                         {
+                            **report_context,
                             "status": "dry_run",
                             "dry_run": True,
                             "missing_found": len(missing),
@@ -432,7 +454,7 @@ def backfill(
             result_path.write_text(
                 json.dumps(
                     {
-                        "date": datetime.now(UTC).date().isoformat(),
+                        **report_context,
                         "status": overall,
                         "missing_found": len(missing),
                         "missing_remaining": len(store.find_missing(source_names, days=days)),

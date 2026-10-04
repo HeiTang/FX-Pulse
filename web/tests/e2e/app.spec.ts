@@ -40,11 +40,11 @@ test('same-day amounts and differences match stored data across all currencies',
         has: page.locator('.result-source strong', { hasText: entry.src }),
       });
       await expect(row.locator('.result-total')).toHaveText(
-        `NT$ ${fmt.format(entry.rate * 10000)}`,
+        `${entry.src === 'JCB' ? '約 ' : ''}NT$ ${fmt.format(entry.rate * 10000)}`,
       );
       if (Math.abs(entry.rate * 10000 - min) < 1e-7)
         await expect(row.locator('.result-difference')).toHaveText(
-          '最低換算額',
+          entry.src === 'JCB' ? '最低參考換算額（估算）' : '最低換算額',
         );
       else
         await expect(row.locator('.result-difference')).toHaveText(
@@ -144,7 +144,7 @@ test('missing sources are explicit and never replaced by rates from other dates'
       .locator('.result-row')
       .filter({ has: page.locator('.result-source strong', { hasText: src }) });
     if (!entries.some((entry) => entry.src === src)) {
-      await expect(row.locator('.result-rate')).toHaveText('此日期無資料');
+      await expect(row.locator('.result-rate')).toContainText('此日期無資料');
       await expect(row.locator('.result-total')).toHaveText('—');
     }
   }
@@ -152,7 +152,9 @@ test('missing sources are explicit and never replaced by rates from other dates'
     await expect(page.locator('.best-badge')).toHaveCount(0);
     await expect(page.locator('#comparison-message')).toContainText('來源不足');
   }
-  await expect(page.locator('.fine-print')).toContainText('JCB 為交叉匯率估算');
+  await expect(page.locator('#conversion-note')).toContainText(
+    'JCB 為交叉匯率估算',
+  );
 });
 
 test('layout, assets and accessibility remain usable including large totals and calendar', async ({
@@ -234,11 +236,11 @@ test('direction switch preserves input and compares foreign budget amounts for e
       });
       const total = 123.45 / entry.rate;
       await expect(row.locator('.result-total')).toHaveText(
-        `${code} ${amountFormat.format(total)}`,
+        `${entry.src === 'JCB' ? '約 ' : ''}${code} ${amountFormat.format(total)}`,
       );
       if (Math.abs(total - best) < 1e-7)
         await expect(row.locator('.result-difference')).toHaveText(
-          '最高可換得金額',
+          entry.src === 'JCB' ? '最高參考可換得金額（估算）' : '最高可換得金額',
         );
       else await expect(row.locator('.result-difference')).toContainText('−');
     }

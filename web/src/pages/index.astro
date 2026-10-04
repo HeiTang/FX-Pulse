@@ -234,6 +234,11 @@ const fetchedAt = formatFetchedAt(ratesData.meta.last_updated);
             ></small>
           </div>
         </div>
+        <p
+          id="query-message"
+          class="field-error query-message"
+          role="status"
+        ></p>
       </section>
 
       <section class="comparison" aria-labelledby="comparison-title">
@@ -338,7 +343,7 @@ const fetchedAt = formatFetchedAt(ratesData.meta.last_updated);
     <footer class="site-footer">
       <div class="shell footer-inner">
         <span>資料來源：VISA / Mastercard / JCB · 非官方工具</span>
-        <span>資料抓取於 {fetchedAt}（台灣時間）</span>
+        <span>資料檔更新時間：{fetchedAt}（台灣時間）</span>
       </div>
     </footer>
 

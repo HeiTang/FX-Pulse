@@ -152,6 +152,9 @@ class TestResultFile:
         data = json.loads(result_path.read_text())
         assert data["status"] == "ok"
         assert data["results"]["VISA"]["status"] == "ok"
+        assert data["results"]["VISA"]["currencies_saved"] == 1
+        assert data["window"] == {"from": "2026-04-15", "to": "2026-04-15"}
+        assert data["sources"] == ["VISA"]
 
     @patch("fx_pulse.cli.get_store")
     @patch("fx_pulse.cli._resolve_scrapers")
@@ -218,6 +221,8 @@ class TestResultFile:
         assert data["status"] == "error"
         assert data["results"]["VISA"]["status"] == "error"
         assert data["results"]["VISA"]["partial_success"] is True
+        assert data["results"]["VISA"]["currencies_saved"] == 1
+        assert data["window"] == {"from": "2026-04-14", "to": "2026-04-15"}
 
 
 class TestBackfillCommand:
@@ -310,3 +315,23 @@ def test_invalid_cli_options_are_readable_usage_errors(options):
 
 def test_duplicate_sources_are_fetched_once():
     assert len(_resolve_scrapers("visa,VISA")) == 1
+
+
+def test_saved_counts_accumulate_across_dates_and_ignore_failed_writes(tmp_path, monkeypatch):
+    from fx_pulse.cli import _run_dates
+    from fx_pulse.store.json_store import JsonStore
+
+    monkeypatch.setattr("fx_pulse.cli.settings.scraper_state_file", tmp_path / "state.json")
+    scraper = MagicMock()
+    scraper.source_name = "VISA"
+    scraper.fetch_all.return_value = {"USD": {"rate": 30, "reverse": 1 / 30}}
+    dates = [datetime(2026, 4, day, tzinfo=UTC) for day in (14, 15)]
+    store = JsonStore(tmp_path / "rates.json")
+    result = _run_dates(scraper, dates, dry_run=False, store=store)
+    assert result["currencies"] == 1
+    assert result["currencies_saved"] == 2
+    assert len(store.export_payload().rates) == 2
+    with patch.object(store, "upsert_rates", side_effect=OSError("cannot save")):
+        result = _run_dates(scraper, dates, dry_run=False, store=store)
+    assert result["currencies_saved"] == 0
+    assert result["status"] == "error"

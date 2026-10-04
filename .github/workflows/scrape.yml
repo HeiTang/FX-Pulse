@@ -64,6 +64,10 @@ jobs:
         if: github.event.schedule == '47 9 * * *' || github.event.schedule == '47 15 * * *' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'backfill')
         run: poetry run backfill-rates --days 7 --result-file scrape_result.json
 
+      - name: Summarize execution and data coverage
+        if: always()
+        run: poetry run python scripts/summarize_scrape.py --result-file scrape_result.json
+
       - name: Preserve scrape report
         if: always()
         uses: actions/upload-artifact@v4
