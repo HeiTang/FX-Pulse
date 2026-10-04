@@ -102,6 +102,8 @@ def test_failed_atomic_save_keeps_old_state():
             Cooldowns().block("VISA", now=NOW + timedelta(hours=6))
     assert settings.scraper_state_file.read_bytes() == before
 
+    assert list(settings.scraper_state_file.parent.glob(".cooldowns-*.tmp")) == []
+
 
 def test_backfill_reports_recovered_and_remaining_currencies(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "currencies", ["USD", "JPY"])

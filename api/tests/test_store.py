@@ -197,7 +197,7 @@ def test_failed_atomic_save_preserves_original_file(tmp_path):
     store = JsonStore(path)
     store.upsert_rates("2026-04-01", "VISA", {"USD": CurrencyRate(rate=32, reverse=1 / 32)})
     before = path.read_bytes()
-    with patch("fx_pulse.store.json_store.json.dump", side_effect=OSError("disk full")):
+    with patch("fx_pulse.json_io.json.dump", side_effect=OSError("disk full")):
         with pytest.raises(OSError):
             store.upsert_rates("2026-04-02", "VISA", {"USD": CurrencyRate(rate=33, reverse=1 / 33)})
     assert path.read_bytes() == before

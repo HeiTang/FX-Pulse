@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import json
-import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from tempfile import NamedTemporaryFile
 
 from pydantic import BaseModel, Field, field_validator
 
 from ..config import settings
+from ..json_io import atomic_write_json
 
 
 class SourceCooldown(BaseModel):
@@ -70,18 +68,4 @@ class Cooldowns:
             self._save()
 
     def _save(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary: Path | None = None
-        try:
-            with NamedTemporaryFile(
-                mode="w", encoding="utf-8", dir=self.path.parent, delete=False
-            ) as f:
-                temporary = Path(f.name)
-                json.dump(self.state.model_dump(mode="json"), f, indent=2, sort_keys=True)
-                f.write("\n")
-                f.flush()
-                os.fsync(f.fileno())
-            temporary.replace(self.path)
-        finally:
-            if temporary is not None:
-                temporary.unlink(missing_ok=True)
+        atomic_write_json(self.path, self.state.model_dump(mode="json"), trailing_newline=True)

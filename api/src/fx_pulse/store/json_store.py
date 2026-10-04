@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import json
-import os
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from tempfile import NamedTemporaryFile
 
 from ..config import settings
+from ..json_io import atomic_write_json
 from ..models.rate import HistoryPoint, RatesPayload
 from .base import BaseStore, SourceRates
 
@@ -31,25 +30,7 @@ class JsonStore(BaseStore):
             return RatesPayload.model_validate(json.load(f))
 
     def _save(self, payload: RatesPayload) -> None:
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        temporary: Path | None = None
-        try:
-            with NamedTemporaryFile(
-                mode="w",
-                encoding="utf-8",
-                dir=self._path.parent,
-                prefix=".rates-",
-                suffix=".tmp",
-                delete=False,
-            ) as f:
-                temporary = Path(f.name)
-                json.dump(payload.model_dump(), f, ensure_ascii=False, indent=2, sort_keys=True)
-                f.flush()
-                os.fsync(f.fileno())
-            temporary.replace(self._path)
-        finally:
-            if temporary is not None:
-                temporary.unlink(missing_ok=True)
+        atomic_write_json(self._path, payload.model_dump(), ensure_ascii=False)
 
     # ── Interface ──────────────────────────────────────────────────────────────
 
