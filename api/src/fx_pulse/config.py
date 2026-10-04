@@ -49,8 +49,6 @@ class Settings(BaseSettings):
 
     # ── API Server ─────────────────────────────────────────────────────────────
     cors_origins: list[str] = ["*"]
-    api_host: str = "0.0.0.0"
-    api_port: int = 8000
 
 
 settings = Settings()
