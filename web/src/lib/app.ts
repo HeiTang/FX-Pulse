@@ -23,12 +23,11 @@ const rateDate = document.querySelector<HTMLInputElement>('#rate-date')!;
 const results = document.querySelector<HTMLElement>('#results')!;
 const chartEl = document.querySelector<HTMLElement>('#chart')!;
 const params = new URLSearchParams(location.search);
-if (
-  Array.from(currency.options).some(
-    (option) => option.value === params.get('currency'),
-  )
-)
-  currency.value = params.get('currency')!;
+const requestedCurrency = params.get('currency');
+const supportedCurrency = Array.from(currency.options).some(
+  (option) => option.value === requestedCurrency,
+);
+if (supportedCurrency) currency.value = requestedCurrency!;
 if (params.has('amount')) amount.value = params.get('amount')!;
 const requestedDate = params.get('date');
 if (requestedDate !== null) {
@@ -46,12 +45,7 @@ let selectedDate = rateDate.value;
 mountDatePicker(rateDate, dates);
 let reverse = params.get('direction') === 'twd-to-foreign';
 const queryErrors: string[] = [];
-if (
-  params.has('currency') &&
-  !Array.from(currency.options).some(
-    (option) => option.value === params.get('currency'),
-  )
-)
+if (params.has('currency') && !supportedCurrency)
   queryErrors.push('連結幣別不支援，已使用預設幣別。');
 if (
   params.has('direction') &&

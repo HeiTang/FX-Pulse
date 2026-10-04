@@ -74,7 +74,7 @@ class JsonStore(BaseStore):
             if entry:
                 points.append(HistoryPoint(date=date_key, **entry.model_dump()))
 
-        return sorted(points, key=lambda p: p.date)
+        return points
 
     def export_payload(self) -> RatesPayload:
         return self._load()
