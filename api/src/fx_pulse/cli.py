@@ -43,6 +43,24 @@ def _setup_logging() -> None:
     )
 
 
+def _overall_status(results: dict[str, dict[str, Any]]) -> str:
+    statuses = {result["status"] for result in results.values()}
+    if statuses <= {"ok", "skipped"}:
+        return "ok"
+    if "blocked" in statuses and "error" not in statuses:
+        return "blocked"
+    return "error"
+
+
+def _write_result(path: str, payload: dict[str, Any]) -> None:
+    result_path = Path(path)
+    try:
+        result_path.parent.mkdir(parents=True, exist_ok=True)
+        result_path.write_text(json.dumps(payload, indent=2))
+    except OSError:
+        log.exception("Failed to write result summary file to %s", result_path)
+
+
 def _resolve_scrapers(source: str | None) -> list[Any]:
     """Build scraper instances from --source flag."""
     if source is None:
@@ -297,29 +315,14 @@ def main(
         )
 
     if result_file:
-        statuses = {r["status"] for r in scraper_results.values()}
-        if statuses <= {"ok", "skipped"}:
-            overall = "ok"
-        elif "blocked" in statuses and not statuses & {"error"}:
-            overall = "blocked"
-        else:
-            overall = "error"
         payload = {
             "date": dates[-1].strftime("%Y-%m-%d"),
-            "status": overall,
+            "status": _overall_status(scraper_results),
             "results": scraper_results,
             "window": {"from": dates[0].date().isoformat(), "to": dates[-1].date().isoformat()},
             "sources": [scraper.source_name for scraper in scrapers],
         }
-        result_path = Path(result_file)
-        try:
-            result_path.parent.mkdir(parents=True, exist_ok=True)
-            result_path.write_text(json.dumps(payload, indent=2))
-        except OSError:
-            log.exception(
-                "Failed to write result summary file to %s; scraping completed",
-                result_path,
-            )
+        _write_result(result_file, payload)
 
 
 @click.command()
@@ -343,13 +346,7 @@ def backfill(
     _setup_logging()
 
     scrapers = _resolve_scrapers(source)
-    # Deduplicate while preserving order (guards against --source visa,VISA)
-    seen: set[str] = set()
-    source_names: list[str] = []
-    for s in scrapers:
-        if s.source_name not in seen:
-            seen.add(s.source_name)
-            source_names.append(s.source_name)
+    source_names = [scraper.source_name for scraper in scrapers]
     store = get_store()
 
     report_end = datetime.now(UTC).date()
@@ -376,24 +373,18 @@ def backfill(
     if not missing:
         log.info("Backfill: nothing missing in the last %d days.", days)
         if result_file:
-            result_path = Path(result_file)
-            try:
-                result_path.parent.mkdir(parents=True, exist_ok=True)
-                result_path.write_text(
-                    json.dumps(
-                        {
-                            **report_context,
-                            "results": {},
-                            "status": "ok",
-                            "missing_found": 0,
-                            "missing_remaining": 0,
-                            "currencies_recovered": 0,
-                            "currencies_remaining": 0,
-                        }
-                    )
-                )
-            except OSError:
-                log.exception("Failed to write result summary file to %s", result_path)
+            _write_result(
+                result_file,
+                {
+                    **report_context,
+                    "results": {},
+                    "status": "ok",
+                    "missing_found": 0,
+                    "missing_remaining": 0,
+                    "currencies_recovered": 0,
+                    "currencies_remaining": 0,
+                },
+            )
         return
 
     log.info("Backfill: %d missing (date, source) pairs found", len(missing))
@@ -403,22 +394,16 @@ def backfill(
         for date_key, src in missing:
             click.echo(f"  MISSING  {date_key}  {src}")
         if result_file:
-            result_path = Path(result_file)
-            try:
-                result_path.parent.mkdir(parents=True, exist_ok=True)
-                result_path.write_text(
-                    json.dumps(
-                        {
-                            **report_context,
-                            "status": "dry_run",
-                            "dry_run": True,
-                            "missing_found": len(missing),
-                            "results": {},
-                        }
-                    )
-                )
-            except OSError:
-                log.exception("Failed to write result summary file to %s", result_path)
+            _write_result(
+                result_file,
+                {
+                    **report_context,
+                    "status": "dry_run",
+                    "dry_run": True,
+                    "missing_found": len(missing),
+                    "results": {},
+                },
+            )
         return
 
     # Group missing pairs by source so we can reuse the JCB batch optimisation
@@ -441,32 +426,15 @@ def backfill(
         )
 
     if result_file:
-        statuses = {r["status"] for r in scraper_results.values()}
-        if statuses <= {"ok", "skipped"}:
-            overall = "ok"
-        elif "blocked" in statuses and "error" not in statuses:
-            overall = "blocked"
-        else:
-            overall = "error"
-        result_path = Path(result_file)
-        try:
-            result_path.parent.mkdir(parents=True, exist_ok=True)
-            result_path.write_text(
-                json.dumps(
-                    {
-                        **report_context,
-                        "status": overall,
-                        "missing_found": len(missing),
-                        "missing_remaining": len(store.find_missing(source_names, days=days)),
-                        "currencies_recovered": currencies_missing_before
-                        - missing_currency_count(missing),
-                        "currencies_remaining": missing_currency_count(missing),
-                        "results": scraper_results,
-                    },
-                    indent=2,
-                )
-            )
-        except OSError:
-            log.exception(
-                "Failed to write result summary file to %s; backfill completed", result_path
-            )
+        _write_result(
+            result_file,
+            {
+                **report_context,
+                "status": _overall_status(scraper_results),
+                "missing_found": len(missing),
+                "missing_remaining": len(store.find_missing(source_names, days=days)),
+                "currencies_recovered": currencies_missing_before - missing_currency_count(missing),
+                "currencies_remaining": missing_currency_count(missing),
+                "results": scraper_results,
+            },
+        )

@@ -335,3 +335,34 @@ def test_saved_counts_accumulate_across_dates_and_ignore_failed_writes(tmp_path,
         result = _run_dates(scraper, dates, dry_run=False, store=store)
     assert result["currencies_saved"] == 0
     assert result["status"] == "error"
+
+
+@pytest.mark.parametrize(
+    ("command", "options", "missing"),
+    [
+        (main, ["--date", "2026-04-15"], []),
+        (backfill, [], []),
+        (backfill, ["--dry-run"], [("2026-04-15", "VISA")]),
+        (backfill, [], [("2026-04-15", "VISA")]),
+    ],
+)
+def test_report_write_failure_does_not_abort_command(command, options, missing, tmp_path, caplog):
+    parent_file = tmp_path / "not-a-directory"
+    parent_file.touch()
+    scraper = MagicMock(source_name="VISA")
+    store = MagicMock()
+    store.find_missing.return_value = missing
+    store.export_payload.return_value.rates = {}
+
+    with (
+        patch("fx_pulse.cli._resolve_scrapers", return_value=[scraper]),
+        patch("fx_pulse.cli.get_store", return_value=store),
+        patch("fx_pulse.cli._run_dates", return_value={"status": "ok"}),
+    ):
+        result = CliRunner().invoke(
+            command,
+            ["--source", "VISA", *options, "--result-file", str(parent_file / "report.json")],
+        )
+
+    assert result.exit_code == 0, result.output
+    assert "Failed to write result summary file" in caplog.text
