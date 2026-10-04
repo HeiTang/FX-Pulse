@@ -1301,3 +1301,27 @@ main.shell {
     height: 16px;
   }
 }
+
+/* Keep the selected foreign currency editable on either side of the route. */
+.route-arrow {
+  border: 0;
+  padding: 0;
+  transition:
+    background-color 150ms ease,
+    transform 150ms ease;
+}
+.route-arrow:hover {
+  background: #d4f59c;
+}
+.route-arrow:active {
+  transform: scale(0.94);
+}
+.route-board.is-reversed .currency-field {
+  text-align: right;
+}
+.route-board.is-reversed .select-wrap {
+  margin-left: auto;
+}
+.route-board.is-reversed .route-destination {
+  text-align: left;
+}

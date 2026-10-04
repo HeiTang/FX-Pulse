@@ -9,6 +9,7 @@ import {
   historyDates,
   rateEntries,
   validRate,
+  conversionRate,
   validateAmount,
   type Source,
   type RateDays,
@@ -30,6 +31,12 @@ if (
 )
   currency.value = params.get('currency')!;
 if (params.has('amount')) amount.value = params.get('amount')!;
+let reverse = false;
+const swap = document.querySelector<HTMLButtonElement>('#swap-direction')!;
+const board = document.querySelector<HTMLElement>('.route-board')!;
+const foreignRoute = document.querySelector<HTMLElement>('.currency-field')!;
+const twdRoute = document.querySelector<HTMLElement>('.route-destination')!;
+const inputCode = () => (reverse ? 'TWD' : currency.value);
 let range: '7' | '30' | 'all' = '7';
 let source: Source | 'all' = 'all';
 let chart: ReturnType<typeof import('./chart').createChart> | null = null;
@@ -37,35 +44,50 @@ let chartModule: Promise<typeof import('./chart')> | null = null;
 let chartVersion = 0;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-const money = new Intl.NumberFormat('zh-TW', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-const decimal = new Intl.NumberFormat('zh-TW', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+const formatMoney = (value: number, code: string) =>
+  new Intl.NumberFormat('zh-TW', {
+    minimumFractionDigits: fractionDigits(code),
+    maximumFractionDigits: fractionDigits(code),
+  }).format(value);
+const unit = (code: string) => (code === 'TWD' ? 'NT$' : code);
 const rateFormat = (n: number) => (n < 1 ? n.toFixed(6) : n.toFixed(4));
 const setText = (selector: string, value: string) => {
   document.querySelector<HTMLElement>(selector)!.textContent = value;
 };
-const amountError = () => validateAmount(amount.value, currency.value).error;
-const validAmount = () => validateAmount(amount.value, currency.value).value;
-const entries = (code: string, day: string) => rateEntries(rateDays, code, day);
+const amountError = () => validateAmount(amount.value, inputCode()).error;
+const validAmount = () => validateAmount(amount.value, inputCode()).value;
+const entries = (code: string, day: string) =>
+  rateEntries(rateDays, code, day, reverse);
 function renderResults() {
   const code = currency.value;
   const value = validAmount();
   const available = entries(code, rateDate.value);
-  const min = available.length
-    ? Math.min(...available.map((item) => item.rate * (value ?? 1)))
+  const from = inputCode();
+  const to = reverse ? code : 'TWD';
+  const bestValue = available.length
+    ? (reverse ? Math.max : Math.min)(
+        ...available.map((item) => item.rate * (value ?? 1)),
+      )
     : null;
-  setText('#comparison-context', `${code} → TWD`);
-  setText('#amount-code', code);
+  setText('#comparison-context', `${from} → ${to}`);
+  setText('#amount-code', from);
+  setText('#amount-label', reverse ? '台幣預算' : '消費金額');
+  setText('#foreign-label', reverse ? '換算幣別' : '消費幣別');
+  setText('#twd-label', reverse ? '預算幣別' : '換算幣別');
+  setText('#rate-heading', `每 1 ${from} 匯率`);
+  setText('#total-heading', `換算${reverse ? currencies[code].name : '台幣'}`);
+  setText('#difference-heading', reverse ? '與最高值的差額' : '與最低值的差額');
+  setText(
+    '#conversion-note',
+    reverse
+      ? '依刷卡參考匯率反推可換得金額，非銀行實際換匯報價；未計手續費與回饋。JCB 為交叉匯率估算。'
+      : '未計銀行手續費與回饋，非實際帳單。JCB 為交叉匯率估算。',
+  );
   setText('#route-code', code);
   setText('#route-flag', currencies[code]?.flag ?? '');
   const error = document.querySelector<HTMLElement>('#amount-error')!;
   error.textContent = amountError();
-  amount.inputMode = fractionDigits(code) === 0 ? 'numeric' : 'decimal';
+  amount.inputMode = fractionDigits(from) === 0 ? 'numeric' : 'decimal';
   amount.setAttribute('aria-invalid', String(value === null));
   results.replaceChildren();
   for (const src of sources) {
@@ -74,8 +96,8 @@ function renderResults() {
       value !== null && rate !== undefined ? value * rate : null;
     const best =
       converted !== null &&
-      min !== null &&
-      Math.abs(converted - min) < 0.0000001 &&
+      bestValue !== null &&
+      Math.abs(converted - bestValue) < 0.0000001 &&
       available.length > 1;
     const row = document.createElement('div');
     row.className = `result-row${best ? ' is-best' : ''}`;
@@ -97,26 +119,34 @@ function renderResults() {
     rateNumber.textContent =
       rate === undefined
         ? '此日期無資料'
-        : `1 ${code} = ${rateFormat(rate)} TWD`;
+        : `1 ${from} = ${rateFormat(rate)} ${to}`;
     rateCell.append(rateNumber);
     const total = document.createElement('div');
     total.className = 'result-total';
     const totalNumber = document.createElement('strong');
     totalNumber.textContent =
-      converted === null ? '—' : `NT$ ${money.format(converted)}`;
+      converted === null ? '—' : `${unit(to)} ${formatMoney(converted, to)}`;
     total.append(totalNumber);
     const difference = document.createElement('div');
     difference.className = 'result-difference';
+    const gap =
+      converted !== null && bestValue !== null
+        ? Math.abs(converted - bestValue)
+        : null;
+    const smallestUnit = 10 ** -fractionDigits(to);
+    const sign = reverse ? '−' : '+';
     difference.textContent =
       converted === null
         ? '—'
         : best
-          ? '最低換算額'
-          : min === null || available.length < 2
+          ? reverse
+            ? '最高可換得金額'
+            : '最低換算額'
+          : gap === null || available.length < 2
             ? '無法比較'
-            : converted - min < 0.005
-              ? '+ 小於 NT$ 0.01'
-              : `+ NT$ ${decimal.format(converted - min)}`;
+            : gap < smallestUnit / 2
+              ? `${sign} 小於 ${unit(to)} ${formatMoney(smallestUnit, to)}`
+              : `${sign} ${unit(to)} ${formatMoney(gap, to)}`;
     if (best) difference.classList.add('best-badge');
     const headline = document.createElement('div');
     headline.className = 'result-headline';
@@ -137,31 +167,48 @@ function renderResults() {
   );
 }
 function renderOverview() {
+  setText(
+    '#overview-hint',
+    reverse
+      ? '每 1 TWD 可換得的最高參考外幣金額；點選可帶入試算。'
+      : '每 1 外幣的最低參考匯率；點選可帶入試算。',
+  );
   for (const button of document.querySelectorAll<HTMLButtonElement>(
     '.currency-card',
   )) {
     const code = button.dataset.currency!;
-    const available = entries(code, rateDate.value).sort(
-      (a, b) => a.rate - b.rate,
+    const available = entries(code, rateDate.value).sort((a, b) =>
+      reverse ? b.rate - a.rate : a.rate - b.rate,
     );
     button.classList.toggle('active', code === currency.value);
     button.setAttribute('aria-pressed', String(code === currency.value));
     button.querySelector<HTMLElement>('[data-card-rate]')!.textContent =
-      available.length ? `NT$ ${rateFormat(available[0].rate)}` : '—';
+      available.length
+        ? `${reverse ? code : 'NT$'} ${rateFormat(available[0].rate)}`
+        : '—';
     button.querySelector<HTMLElement>('[data-card-source]')!.textContent =
-      available.length ? `${available[0].src} · 1 ${code}` : '此日期無資料';
+      available.length
+        ? `${available[0].src} · 1 ${reverse ? 'TWD' : code}`
+        : '此日期無資料';
   }
 }
 async function renderChart() {
   const version = ++chartVersion;
   const code = currency.value;
-  setText('#chart-title', `${code} / TWD`);
+  const reversed = reverse;
+  const from = reversed ? 'TWD' : code;
+  const to = reversed ? code : 'TWD';
+  setText('#chart-title', `${from} / ${to}`);
+  setText(
+    '#chart-note',
+    `1 ${from} = ${to} · 截至所選日期 · 線段可能跨過缺資料日`,
+  );
   const visibleDates = historyDates(dates, rateDate.value, range);
   const visibleSources = source === 'all' ? sources : [source];
   const hasEnough = visibleSources.some(
     (src) =>
       visibleDates.filter((date) =>
-        validRate(rateDays[date]?.[src]?.[code]?.rate),
+        validRate(conversionRate(rateDays[date]?.[src]?.[code], reversed)),
       ).length >= 2,
   );
   const placeholder =
@@ -171,7 +218,7 @@ async function renderChart() {
   placeholder.hidden = hasEnough;
   chartEl.setAttribute(
     'aria-label',
-    `${code} 對台幣，${visibleDates[0] ?? ''} 至 ${visibleDates.at(-1) ?? ''}，${visibleSources.join('、')} 匯率走勢`,
+    `${from} 對 ${to}，${visibleDates[0] ?? ''} 至 ${visibleDates.at(-1) ?? ''}，${visibleSources.join('、')} 匯率走勢`,
   );
   if (!hasEnough) {
     chart?.clear();
@@ -201,7 +248,7 @@ async function renderChart() {
         borderWidth: 0,
         textStyle: { color: '#fff', fontSize: 12 },
         valueFormatter: (value: unknown) =>
-          value == null ? '無資料' : `NT$ ${rateFormat(Number(value))}`,
+          value == null ? '無資料' : `${unit(to)} ${rateFormat(Number(value))}`,
       },
       xAxis: {
         type: 'category',
@@ -230,7 +277,7 @@ async function renderChart() {
         name: src,
         type: 'line',
         data: visibleDates.map((date) => {
-          const rate = rateDays[date]?.[src]?.[code]?.rate;
+          const rate = conversionRate(rateDays[date]?.[src]?.[code], reversed);
           return validRate(rate) ? rate : null;
         }),
         connectNulls: true,
@@ -268,6 +315,18 @@ document
       render();
     }),
   );
+swap.addEventListener('click', () => {
+  reverse = !reverse;
+  board.replaceChildren(
+    reverse ? twdRoute : foreignRoute,
+    swap,
+    reverse ? foreignRoute : twdRoute,
+  );
+  board.classList.toggle('is-reversed', reverse);
+  swap.setAttribute('aria-pressed', String(reverse));
+  render();
+  swap.focus({ preventScroll: true });
+});
 currency.addEventListener('change', render);
 amount.addEventListener('input', renderResults);
 amount.addEventListener('focus', () => amount.select());
@@ -275,7 +334,7 @@ amount.addEventListener('blur', () => {
   const value = validAmount();
   if (value !== null)
     amount.value = new Intl.NumberFormat('en-US', {
-      maximumFractionDigits: fractionDigits(currency.value),
+      maximumFractionDigits: fractionDigits(inputCode()),
     }).format(value);
   renderResults();
 });

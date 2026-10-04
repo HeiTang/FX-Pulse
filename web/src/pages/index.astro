@@ -78,7 +78,7 @@ const fetchedAt = formatFetchedAt(ratesData.meta.last_updated);
             <span id="route-flag" class="route-flag" aria-hidden="true">
               🇯🇵
             </span>{' '}
-            消費幣別
+            <span id="foreign-label">消費幣別</span>
           </label>
           <strong id="route-code" class="route-code">
             JPY
@@ -94,15 +94,22 @@ const fetchedAt = formatFetchedAt(ratesData.meta.last_updated);
             </select>
           </div>
         </div>
-        <span class="route-arrow" aria-hidden="true">
-          →
-        </span>
+        <button
+          type="button"
+          id="swap-direction"
+          class="route-arrow"
+          aria-label="切換換算方向"
+          aria-pressed="false"
+          title="切換換算方向"
+        >
+          <span aria-hidden="true">↔</span>
+        </button>
         <div class="route-destination">
           <span>
             <span class="route-flag" aria-hidden="true">
               🇹🇼
             </span>{' '}
-            換算幣別
+            <span id="twd-label">換算幣別</span>
           </span>
           <strong class="route-code">TWD</strong>
           <span>新台幣</span>
@@ -129,7 +136,9 @@ const fetchedAt = formatFetchedAt(ratesData.meta.last_updated);
         </div>
         <div class="input-panel">
           <div class="field amount-field">
-            <label for="amount">消費金額</label>
+            <label id="amount-label" for="amount">
+              消費金額
+            </label>
             <div class="amount-wrap">
               <span id="amount-code">JPY</span>
               <input
@@ -237,9 +246,9 @@ const fetchedAt = formatFetchedAt(ratesData.meta.last_updated);
         <div class="comparison-panel">
           <div class="table-head" aria-hidden="true">
             <span>卡組織</span>
-            <span>每 1 外幣匯率</span>
-            <span>換算台幣</span>
-            <span>與最低值的差額</span>
+            <span id="rate-heading">每 1 外幣匯率</span>
+            <span id="total-heading">換算台幣</span>
+            <span id="difference-heading">與最低值的差額</span>
           </div>
           <div id="results" class="results" aria-live="polite"></div>
           <div
@@ -248,7 +257,7 @@ const fetchedAt = formatFetchedAt(ratesData.meta.last_updated);
             role="status"
           ></div>
         </div>
-        <p class="fine-print">
+        <p class="fine-print" id="conversion-note">
           未計銀行手續費與回饋，非實際帳單。JCB 為交叉匯率估算。
         </p>
       </section>
@@ -289,7 +298,7 @@ const fetchedAt = formatFetchedAt(ratesData.meta.last_updated);
           <div id="chart-placeholder" class="chart-placeholder" hidden>
             所選期間可用資料不足，無法繪製走勢。
           </div>
-          <p class="chart-note">
+          <p class="chart-note" id="chart-note">
             1 外幣 = TWD · 截至所選日期 · 線段可能跨過缺資料日
           </p>
         </div>
@@ -301,7 +310,9 @@ const fetchedAt = formatFetchedAt(ratesData.meta.last_updated);
             <h2 id="overview-title">其他幣別</h2>
             <span>{ratesData.meta.currencies.length} 種幣別參考匯率</span>
           </summary>
-          <p class="section-hint">每 1 外幣的最低參考匯率；點選可帶入試算。</p>
+          <p class="section-hint" id="overview-hint">
+            每 1 外幣的最低參考匯率；點選可帶入試算。
+          </p>
           <div id="overview-grid" class="overview-grid">
             {ratesData.meta.currencies.map((code) => (
               <button type="button" class="currency-card" data-currency={code}>
