@@ -1,6 +1,6 @@
 """Abstract base scraper — shared retry logic, logging, and interface contract.
 
-All card network scrapers (VISA, Mastercard, JCB, ...) inherit from this class,
+VISA and Mastercard scrapers inherit from this class,
 ensuring consistent behavior for retry, backoff, UA rotation, and logging.
 """
 
@@ -17,6 +17,7 @@ from curl_cffi import requests as cf_requests
 from fake_useragent import UserAgent
 
 from ..config import settings
+from ..models.rate import CurrencyRate
 
 logger = logging.getLogger(__name__)
 _ua = UserAgent()
@@ -133,7 +134,7 @@ class BaseScraper(ABC):
                 data = resp.json()
                 logger.debug("[%s] %s/TWD | raw response: %s", self.source_name, currency, data)
 
-                result = self._parse_response(data)
+                result = CurrencyRate(**self._parse_response(data)).model_dump()
                 logger.info(
                     "[%s] %s/TWD | rate=%.10f reverse=%.6f",
                     self.source_name,
@@ -171,6 +172,8 @@ class BaseScraper(ABC):
                     sleep,
                 )
                 # Reset session so next attempt picks a fresh impersonate target
+                if self._session is not None:
+                    self._session.close()
                 self._session = None
                 time.sleep(sleep)
 

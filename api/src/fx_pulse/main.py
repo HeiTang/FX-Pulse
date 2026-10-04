@@ -7,7 +7,7 @@ from .routers import rates
 app = FastAPI(
     title="FX Pulse API",
     version="0.1.0",
-    description="VISA 匯率歷史查詢 API",
+    description="VISA、Mastercard 與 JCB 參考匯率歷史查詢 API",
 )
 
 app.add_middleware(

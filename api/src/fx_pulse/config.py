@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     currencies: list[str] = ["USD", "JPY", "EUR", "GBP", "HKD", "AUD", "KRW", "SGD"]
 
     # ── Storage ─────────────────────────────────────────────────────────────────
-    storage_backend: str = "json"  # "json" | "turso" | "d1"
+    storage_backend: str = "json"  # Only the JSON backend is implemented.
     data_file: Path = _PROJECT_ROOT / "web" / "src" / "data" / "rates.json"  # json backend
 
     # ── Scraper ────────────────────────────────────────────────────────────────

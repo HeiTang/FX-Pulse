@@ -1,396 +1,338 @@
 ---
 import '../styles/global.css';
 import ratesData from '../data/rates.json';
+import { currencies, availableDates, formatFetchedAt } from '../lib/rates';
 
-const { meta, rates } = ratesData;
-const dates = Object.keys(rates).sort();
-const latestDate = dates[dates.length - 1];
-const latestDay = rates[latestDate as keyof typeof rates] ?? {};
-
-const currencyInfo: Record<string, { flag: string; name: string }> = {
-  USD: { flag: '🇺🇸', name: '美元' },
-  JPY: { flag: '🇯🇵', name: '日圓' },
-  EUR: { flag: '🇪🇺', name: '歐元' },
-  GBP: { flag: '🇬🇧', name: '英鎊' },
-  HKD: { flag: '🇭🇰', name: '港幣' },
-  AUD: { flag: '🇦🇺', name: '澳幣' },
-  KRW: { flag: '🇰🇷', name: '韓元' },
-  SGD: { flag: '🇸🇬', name: '新加坡幣' },
-};
-
-type RateEntry = { rate: number; reverse: number };
-const allSources = ['VISA', 'Mastercard', 'JCB'] as const;
-const sourceRates: Record<string, Record<string, RateEntry>> = {};
-for (const src of allSources) {
-  sourceRates[src] = (latestDay as Record<string, Record<string, RateEntry>>)?.[src] ?? {};
-}
-
-function fmt(rate: number): string {
-  return rate >= 1 ? rate.toFixed(4) : rate.toFixed(6);
-}
-
-// Per-currency: which source has the lowest rate (best for cardholder)
-function rateRank(currency: string): Record<string, 'best' | 'worst' | null> {
-  const vals = allSources
-    .map((s) => ({ src: s, rate: sourceRates[s][currency]?.rate }))
-    .filter((v) => v.rate != null && v.rate > 0);
-  if (vals.length < 2) return Object.fromEntries(allSources.map((s) => [s, null]));
-  const min = Math.min(...vals.map((v) => v.rate!));
-  const max = Math.max(...vals.map((v) => v.rate!));
-  const result: Record<string, 'best' | 'worst' | null> = {};
-  for (const s of allSources) {
-    const r = sourceRates[s][currency]?.rate;
-    if (r === min) result[s] = 'best';
-    else if (r === max) result[s] = 'worst';
-    else result[s] = null;
-  }
-  return result;
-}
-
-const ratesJson = JSON.stringify(ratesData);
+const dates = availableDates(ratesData.rates);
+const earliestDate = dates.at(0) ?? '';
+const latestDate = dates.at(-1) ?? '';
+const fetchedAt = formatFetchedAt(ratesData.meta.last_updated);
 ---
 
+<!doctype html>
 <html lang="zh-Hant">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>FX Pulse — 匯率脈動</title>
+    <meta name="theme-color" content="#111720" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>FX Pulse — 外幣刷卡試算</title>
+    <meta
+      name="description"
+      content="比較 VISA、Mastercard 和 JCB 的歷史匯率，試算外幣消費的台幣換算金額。"
+    />
   </head>
-  <body class="bg-gray-950 text-gray-100 min-h-screen antialiased">
-    <!-- Header -->
-    <header class="border-b border-gray-800 px-6 py-4">
-      <div class="max-w-7xl mx-auto flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 shrink-0" aria-hidden="true">
-            <g fill="none" stroke-linecap="round">
-              <path d="M 10 50 C 23 24, 37 24, 50 50 S 77 76, 90 50" stroke="#4D9EFF" stroke-width="3.5"/>
-              <path d="M 10 50 C 23 32, 37 32, 50 50 S 77 68, 90 50" stroke="#4D9EFF" stroke-width="2.5" opacity="0.5"/>
-              <path d="M 10 50 C 23 40, 37 40, 50 50 S 77 60, 90 50" stroke="#4D9EFF" stroke-width="1.5" opacity="0.22"/>
-            </g>
-            <circle cx="10" cy="50" r="3.5" fill="#4D9EFF"/>
-            <circle cx="90" cy="50" r="3.5" fill="#4D9EFF"/>
+  <body>
+    <header class="site-header">
+      <div class="shell header-inner">
+        <a class="brand" href="/" aria-label="FX Pulse 首頁">
+          <svg
+            class="brand-mark"
+            viewBox="0 0 40 40"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M3 21c6-13 11-13 17 0s11 13 17 0"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+            />
+            <path
+              d="M3 25c6-13 11-13 17 0s11 13 17 0"
+              stroke="currentColor"
+              stroke-opacity=".25"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
           </svg>
-          <h1 class="text-xl font-bold tracking-tight">FX Pulse</h1>
-        </div>
-        <div class="text-sm text-gray-400">
-          更新時間：<time class="text-gray-300">{latestDate}</time>
-        </div>
+          <span>
+            FX Pulse <small>匯率脈動</small>
+          </span>
+        </a>
+        <a
+          class="github-link"
+          href="https://github.com/HeiTang/FX-Pulse"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="在新分頁開啟 FX Pulse GitHub 專案"
+          title="GitHub 專案"
+        >
+          <img
+            src="/icons/github.svg"
+            width="22"
+            height="22"
+            alt=""
+            aria-hidden="true"
+          />
+        </a>
       </div>
     </header>
 
-    <main class="max-w-7xl mx-auto px-6 py-8 space-y-8">
-      <!-- Source Tabs -->
-      <div class="flex gap-2">
-        <button data-source="all" class="source-tab px-4 py-1.5 rounded-full text-sm font-medium transition-all bg-indigo-500/20 text-indigo-400 border border-indigo-500/50">
-          全部
-        </button>
-        <button data-source="VISA" class="source-tab px-4 py-1.5 rounded-full text-sm font-medium transition-all text-gray-400 border border-gray-700 hover:border-gray-500">
-          VISA
-        </button>
-        <button data-source="Mastercard" class="source-tab px-4 py-1.5 rounded-full text-sm font-medium transition-all text-gray-400 border border-gray-700 hover:border-gray-500">
-          Mastercard
-        </button>
-        <button data-source="JCB" class="source-tab px-4 py-1.5 rounded-full text-sm font-medium transition-all text-gray-400 border border-gray-700 hover:border-gray-500">
-          JCB
-        </button>
-      </div>
+    <main class="shell">
+      <h1 class="sr-only">外幣刷卡匯率比較</h1>
 
-      <!-- Rate Cards -->
-      <section>
-        <h2 class="text-sm font-medium text-gray-400 mb-4 uppercase tracking-wider">即時匯率</h2>
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {meta.currencies.map((currency: string) => {
-            const info = currencyInfo[currency];
-            const rank = rateRank(currency);
-            const sourceLabels = [
-              { key: 'VISA', label: 'VISA', color: 'text-indigo-400' },
-              { key: 'Mastercard', label: 'Mastercard', color: 'text-amber-400' },
-              { key: 'JCB', label: 'JCB', color: 'text-rose-400' },
-            ];
-            return (
+      <div class="route-board">
+        <div class="field currency-field">
+          <label for="currency">
+            <span id="route-flag" class="route-flag" aria-hidden="true">
+              🇯🇵
+            </span>{' '}
+            消費幣別
+          </label>
+          <strong id="route-code" class="route-code">
+            JPY
+          </strong>
+          <div class="select-wrap">
+            <select id="currency" name="currency">
+              {ratesData.meta.currencies.map((code) => (
+                <option value={code} selected={code === 'JPY'}>
+                  {currencies[code]?.flag} {code} ·{' '}
+                  {currencies[code]?.name ?? code}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <span class="route-arrow" aria-hidden="true">
+          →
+        </span>
+        <div class="route-destination">
+          <span>
+            <span class="route-flag" aria-hidden="true">
+              🇹🇼
+            </span>{' '}
+            換算幣別
+          </span>
+          <strong class="route-code">TWD</strong>
+          <span>新台幣</span>
+        </div>
+      </div>
+      <section class="workspace" aria-label="外幣消費試算">
+        <div class="currency-shortcuts" role="group" aria-label="快速選擇幣別">
+          {['JPY', 'USD', 'KRW', 'EUR', 'GBP', 'HKD', 'AUD', 'SGD']
+            .filter((code) => ratesData.meta.currencies.includes(code))
+            .map((code) => (
               <button
-                data-currency={currency}
-                class="currency-card group relative bg-gray-900 border border-gray-800 rounded-xl p-4 text-left transition-all hover:border-indigo-500/50 hover:bg-gray-900/80 cursor-pointer"
+                type="button"
+                data-quick-currency={code}
+                aria-pressed={code === 'JPY'}
+                aria-label={`${currencies[code]?.name ?? code} ${code}`}
               >
-                <div class="flex items-center gap-2 mb-3">
-                  <span class="text-lg">{info?.flag}</span>
-                  <span class="text-sm font-medium text-gray-300">{currency}</span>
-                  <span class="text-xs text-gray-500">{info?.name}</span>
-                </div>
-                {sourceLabels.map((s) => {
-                  const rate = sourceRates[s.key]?.[currency];
-                  const r = rank[s.key];
-                  const rateClass = r === 'best' ? 'text-emerald-400' : r === 'worst' ? 'text-red-400' : 'text-gray-100';
-                  return (
-                    <div class="flex items-center justify-between mb-1 source-row" data-row-source={s.key}>
-                      <span class:list={['text-xs', s.color]}>{s.label}</span>
-                      <span class:list={['rate-value text-base font-mono font-semibold', rateClass]}>
-                        {rate ? fmt(rate.rate) : '—'}
-                      </span>
-                    </div>
-                  );
-                })}
+                <span class="currency-flag" aria-hidden="true">
+                  {currencies[code]?.flag ?? '🌐'}
+                </span>
+                <strong>{code}</strong>
+                <span>{currencies[code]?.name ?? code}</span>
               </button>
-            );
-          })}
+            ))}
+        </div>
+        <div class="input-panel">
+          <div class="field amount-field">
+            <label for="amount">消費金額</label>
+            <div class="amount-wrap">
+              <span id="amount-code">JPY</span>
+              <input
+                id="amount"
+                name="amount"
+                type="text"
+                inputmode="numeric"
+                autocomplete="off"
+                value="10,000"
+                aria-describedby="amount-error"
+              />
+            </div>
+            <small id="amount-error" class="field-error" role="alert"></small>
+          </div>
+          <div class="field date-field">
+            <label id="rate-date-label" for="date-trigger">
+              匯率日期
+            </label>
+            <div class="date-select">
+              <input
+                id="rate-date"
+                name="rate-date"
+                type="date"
+                min={earliestDate}
+                max={latestDate}
+                value={latestDate}
+                required
+                hidden
+              />
+              <button
+                id="date-trigger"
+                type="button"
+                aria-haspopup="dialog"
+                aria-expanded="false"
+                aria-controls="date-picker"
+                aria-labelledby="rate-date-label date-display"
+              >
+                <svg
+                  class="date-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <rect x="4" y="5" width="16" height="16" rx="4" />
+                  <path d="M8 3v4m8-4v4M4 11h16m-11 4h2m2 0h2" />
+                </svg>
+                <span id="date-display">{latestDate.replaceAll('-', '/')}</span>
+                <span class="date-chevron" aria-hidden="true">
+                  ⌄
+                </span>
+              </button>
+              <div
+                id="date-picker"
+                class="date-picker"
+                role="dialog"
+                aria-label="選擇匯率日期"
+                hidden
+              >
+                <div class="calendar-header">
+                  <button
+                    type="button"
+                    data-month-step="-1"
+                    aria-label="上個月"
+                  >
+                    ‹
+                  </button>
+                  <strong id="calendar-month" aria-live="polite"></strong>
+                  <button type="button" data-month-step="1" aria-label="下個月">
+                    ›
+                  </button>
+                </div>
+                <div class="calendar-weekdays" aria-hidden="true">
+                  {['日', '一', '二', '三', '四', '五', '六'].map((day) => (
+                    <span>{day}</span>
+                  ))}
+                </div>
+                <div
+                  id="calendar-days"
+                  class="calendar-days"
+                  role="group"
+                  aria-label="日期"
+                ></div>
+                <p class="calendar-range">
+                  資料期間 {earliestDate.replaceAll('-', '/')}–
+                  {latestDate.replaceAll('-', '/')}
+                </p>
+              </div>
+            </div>
+            <small
+              id="date-error"
+              class="field-error date-error"
+              role="status"
+            ></small>
+          </div>
         </div>
       </section>
 
-      <!-- Chart Section -->
-      <section>
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wider">走勢圖表</h2>
-          <div id="active-currency" class="text-sm font-medium text-indigo-400"></div>
+      <section class="comparison" aria-labelledby="comparison-title">
+        <div class="section-heading comparison-heading">
+          <h2 id="comparison-title">換算結果</h2>
+          <span class="comparison-context" id="comparison-context">
+            JPY → TWD
+          </span>
         </div>
-          <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <div id="chart" class="w-full" style="height: 400px;"></div>
-            <div id="chart-placeholder" class="hidden w-full flex items-center justify-center text-gray-500 text-sm" style="height: 400px;">
-              資料累積中，需至少 2 天數據才能繪製走勢圖
-            </div>
-            <p class="mt-3 text-xs text-gray-500">
-              * 部分來源於假日可能無資料，曲線為跨缺值連線顯示。
-            </p>
+        <div class="comparison-panel">
+          <div class="table-head" aria-hidden="true">
+            <span>卡組織</span>
+            <span>每 1 外幣匯率</span>
+            <span>換算台幣</span>
+            <span>與最低值的差額</span>
           </div>
-        </section>
+          <div id="results" class="results" aria-live="polite"></div>
+          <div
+            id="comparison-message"
+            class="comparison-message"
+            role="status"
+          ></div>
+        </div>
+        <p class="fine-print">
+          未計銀行手續費與回饋，非實際帳單。JCB 為交叉匯率估算。
+        </p>
+      </section>
 
-      <!-- Footer -->
-      <footer class="text-center text-xs text-gray-600 pb-8">
-        資料來源：VISA / Mastercard / JCB Exchange Rate · 基準貨幣：TWD
-      </footer>
+      <section class="history" aria-labelledby="history-title">
+        <div class="history-panel">
+          <div class="history-toolbar">
+            <h2 id="history-title">
+              匯率走勢 <span id="chart-title">JPY / TWD</span>
+            </h2>
+            <div class="segmented" role="group" aria-label="走勢期間">
+              <button type="button" data-range="7" aria-pressed="true">
+                7 天
+              </button>
+              <button type="button" data-range="30" aria-pressed="false">
+                30 天
+              </button>
+              <button type="button" data-range="all" aria-pressed="false">
+                全部
+              </button>
+            </div>
+          </div>
+          <div class="source-filters" role="group" aria-label="走勢資料來源">
+            <button type="button" data-source="all" aria-pressed="true">
+              全部來源
+            </button>
+            <button type="button" data-source="VISA" aria-pressed="false">
+              <i class="legend-dot visa"></i> VISA
+            </button>
+            <button type="button" data-source="Mastercard" aria-pressed="false">
+              <i class="legend-dot mastercard"></i> Mastercard
+            </button>
+            <button type="button" data-source="JCB" aria-pressed="false">
+              <i class="legend-dot jcb"></i> JCB
+            </button>
+          </div>
+          <div id="chart" role="img" aria-label="歷史匯率走勢圖"></div>
+          <div id="chart-placeholder" class="chart-placeholder" hidden>
+            所選期間可用資料不足，無法繪製走勢。
+          </div>
+          <p class="chart-note">
+            1 外幣 = TWD · 截至所選日期 · 線段可能跨過缺資料日
+          </p>
+        </div>
+      </section>
+
+      <section class="overview" aria-labelledby="overview-title">
+        <details>
+          <summary>
+            <h2 id="overview-title">其他幣別</h2>
+            <span>{ratesData.meta.currencies.length} 種幣別參考匯率</span>
+          </summary>
+          <p class="section-hint">每 1 外幣的最低參考匯率；點選可帶入試算。</p>
+          <div id="overview-grid" class="overview-grid">
+            {ratesData.meta.currencies.map((code) => (
+              <button type="button" class="currency-card" data-currency={code}>
+                <span class="card-code">
+                  <span class="overview-flag" aria-hidden="true">
+                    {currencies[code]?.flag}
+                  </span>{' '}
+                  {code}
+                  <small>{currencies[code]?.name}</small>
+                </span>
+                <span class="card-rate" data-card-rate={code}>
+                  —
+                </span>
+                <span class="card-source" data-card-source={code}>
+                  暫無資料
+                </span>
+              </button>
+            ))}
+          </div>
+        </details>
+      </section>
     </main>
-
-    <script define:vars={{ ratesJson }}>
-      window.__FX_RATES__ = JSON.parse(ratesJson);
-    </script>
+    <footer class="site-footer">
+      <div class="shell footer-inner">
+        <span>資料來源：VISA / Mastercard / JCB · 非官方工具</span>
+        <span>資料抓取於 {fetchedAt}（台灣時間）</span>
+      </div>
+    </footer>
 
     <script>
-      import * as echarts from 'echarts/core';
-      import { LineChart } from 'echarts/charts';
-      import {
-        TooltipComponent,
-        GridComponent,
-        DataZoomComponent,
-        LegendComponent,
-      } from 'echarts/components';
-      import { CanvasRenderer } from 'echarts/renderers';
-
-      echarts.use([
-        LineChart,
-        TooltipComponent,
-        GridComponent,
-        DataZoomComponent,
-        LegendComponent,
-        CanvasRenderer,
-      ]);
-
-      const ratesData = (window as any).__FX_RATES__ ?? {};
-      const dates = Object.keys(ratesData.rates ?? {}).sort();
-      const sources = ['VISA', 'Mastercard', 'JCB'] as const;
-
-      const currencyNames = {
-        USD: '美元', JPY: '日圓', EUR: '歐元', GBP: '英鎊',
-        HKD: '港幣', AUD: '澳幣', KRW: '韓元', SGD: '新加坡幣',
-      } as Record<string, string>;
-
-      const sourceColors = {
-        VISA: { line: '#6366f1', area0: 'rgba(99, 102, 241, 0.25)', area1: 'rgba(99, 102, 241, 0.02)' },
-        Mastercard: { line: '#f59e0b', area0: 'rgba(245, 158, 11, 0.20)', area1: 'rgba(245, 158, 11, 0.02)' },
-        JCB: { line: '#f43f5e', area0: 'rgba(244, 63, 94, 0.20)', area1: 'rgba(244, 63, 94, 0.02)' },
-      } as Record<string, { line: string; area0: string; area1: string }>;
-
-      let chart: ReturnType<typeof echarts.init> | null = null;
-      let activeCurrency = 'USD';
-      let activeSource: string = 'all';
-
-      function getSeriesData(currency: string, source: string) {
-        return dates.map((d: string) => ratesData.rates[d]?.[source]?.[currency]?.rate ?? null);
-      }
-
-      function getVisibleSources(): string[] {
-        if (activeSource === 'all') return ['VISA', 'Mastercard', 'JCB'];
-        return [activeSource];
-      }
-
-      function buildOption(currency: string) {
-        const visible = getVisibleSources();
-        const seriesList = visible.map((src) => {
-          const colors = sourceColors[src];
-          return {
-            name: src,
-            type: 'line' as const,
-            data: getSeriesData(currency, src),
-            smooth: true,
-            connectNulls: true,
-            symbol: 'circle',
-            symbolSize: 5,
-            lineStyle: { color: colors.line, width: 2 },
-            itemStyle: { color: colors.line },
-            areaStyle: {
-              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: colors.area0 },
-                { offset: 1, color: colors.area1 },
-              ]),
-            },
-          };
-        });
-
-        return {
-          backgroundColor: 'transparent',
-          grid: { left: 60, right: 20, top: 40, bottom: 50 },
-          legend: {
-            show: visible.length > 1,
-            top: 4,
-            right: 0,
-            textStyle: { color: '#9ca3af', fontSize: 12 },
-            itemWidth: 16,
-            itemHeight: 2,
-          },
-          tooltip: {
-            trigger: 'axis' as const,
-            backgroundColor: 'rgba(15, 15, 25, 0.95)',
-            borderColor: '#333',
-            textStyle: { color: '#e5e7eb', fontSize: 12 },
-            formatter(params: any) {
-              const items = Array.isArray(params) ? params : [params];
-              const hasMissing = items.some((p: any) => p.value == null);
-              let html = '<b>' + items[0].name + '</b>';
-              for (const p of items) {
-                const val = p.value != null ? Number(p.value).toFixed(4) : '—';
-                const dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + p.color + ';margin-right:6px;"></span>';
-                html += '<br/>' + dot + p.seriesName + ': <b>' + val + '</b>';
-              }
-              html += '<br/><span style="color:#6b7280">1 ' + currency + ' → TWD</span>';
-              if (hasMissing) {
-                html += '<br/><span style="color:#6b7280">假日無匯率</span>';
-              }
-              return html;
-            },
-          },
-          xAxis: {
-            type: 'category' as const,
-            data: dates,
-            axisLabel: { color: '#6b7280', fontSize: 11 },
-            axisLine: { lineStyle: { color: '#374151' } },
-          },
-          yAxis: {
-            type: 'value' as const,
-            scale: true,
-            splitLine: { lineStyle: { color: '#1f2937' } },
-            axisLabel: { color: '#6b7280', fontSize: 11 },
-          },
-          dataZoom: [{ type: 'inside' as const, start: 0, end: 100 }],
-          series: seriesList,
-        };
-      }
-
-      function renderChart(currency: string) {
-        const chartEl = document.getElementById('chart')!;
-        const placeholder = document.getElementById('chart-placeholder')!;
-
-        if (dates.length < 2) {
-          chartEl.classList.add('hidden');
-          placeholder.classList.remove('hidden');
-          return;
-        }
-
-        chartEl.classList.remove('hidden');
-        placeholder.classList.add('hidden');
-
-        if (!chart) {
-          chart = echarts.init(chartEl);
-        }
-        chart.setOption(buildOption(currency), true);
-      }
-
-      function setActiveCurrency(currency: string) {
-        activeCurrency = currency;
-
-        document.querySelectorAll('.currency-card').forEach((el) => {
-          const c = (el as HTMLElement).dataset.currency;
-          if (c === currency) {
-            el.classList.add('border-indigo-500', 'bg-gray-800/50');
-            el.classList.remove('border-gray-800');
-          } else {
-            el.classList.remove('border-indigo-500', 'bg-gray-800/50');
-            el.classList.add('border-gray-800');
-          }
-        });
-
-        const label = document.getElementById('active-currency');
-        if (label) {
-          label.textContent = currency + ' — ' + (currencyNames[currency] ?? currency);
-        }
-
-        renderChart(currency);
-      }
-
-      function setActiveSource(source: string) {
-        activeSource = source;
-
-        // Update tab styles
-        document.querySelectorAll('.source-tab').forEach((el) => {
-          const s = (el as HTMLElement).dataset.source;
-          if (s === source) {
-            el.classList.add('bg-indigo-500/20', 'text-indigo-400', 'border-indigo-500/50');
-            el.classList.remove('text-gray-400', 'border-gray-700');
-          } else {
-            el.classList.remove('bg-indigo-500/20', 'text-indigo-400', 'border-indigo-500/50');
-            el.classList.add('text-gray-400', 'border-gray-700');
-          }
-        });
-
-        // Toggle card rows visibility
-        document.querySelectorAll('.source-row').forEach((el) => {
-          const rowSrc = (el as HTMLElement).dataset.rowSource;
-          if (source === 'all' || rowSrc === source) {
-            (el as HTMLElement).style.display = '';
-          } else {
-            (el as HTMLElement).style.display = 'none';
-          }
-        });
-
-        // Toggle rate value colors: show comparison colors only in "all" mode
-        document.querySelectorAll('.rate-value').forEach((el) => {
-          const htmlEl = el as HTMLElement;
-          if (source === 'all') {
-            // Restore original classes (stored via data attr on first run)
-            const orig = htmlEl.dataset.origClass;
-            if (orig) htmlEl.className = orig;
-          } else {
-            // Store original and reset to neutral
-            if (!htmlEl.dataset.origClass) {
-              htmlEl.dataset.origClass = htmlEl.className;
-            }
-            htmlEl.className = htmlEl.className
-              .replace(/text-emerald-400/g, 'text-gray-100')
-              .replace(/text-red-400/g, 'text-gray-100');
-          }
-        });
-
-        renderChart(activeCurrency);
-      }
-
-      // Source tab clicks
-      document.querySelectorAll('.source-tab').forEach((el) => {
-        el.addEventListener('click', () => {
-          const source = (el as HTMLElement).dataset.source;
-          if (source) setActiveSource(source);
-        });
-      });
-
-      // Currency card clicks
-      document.querySelectorAll('.currency-card').forEach((el) => {
-        el.addEventListener('click', () => {
-          const currency = (el as HTMLElement).dataset.currency;
-          if (currency) setActiveCurrency(currency);
-        });
-      });
-
-      window.addEventListener('resize', () => chart?.resize());
-
-      // Init
-      setActiveCurrency('USD');
+      import '../lib/app';
     </script>
   </body>
 </html>

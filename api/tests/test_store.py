@@ -5,6 +5,8 @@ from __future__ import annotations
 from datetime import date
 from unittest.mock import patch
 
+import pytest
+
 from fx_pulse.models.rate import CurrencyRate
 from fx_pulse.store.json_store import JsonStore
 
@@ -164,3 +166,43 @@ class TestFindMissing:
 
         assert ("2026-04-20", "VISA") in missing
         assert ("2026-04-21", "VISA") not in missing
+
+
+def test_history_uses_calendar_window_even_when_days_are_missing(tmp_path):
+    store = JsonStore(tmp_path / "rates.json")
+    for key in ["2026-04-01", "2026-04-10", "2026-04-15"]:
+        store.upsert_rates(key, "VISA", {"USD": CurrencyRate(rate=32, reverse=1 / 32)})
+    assert [point.date for point in store.get_history("USD", "VISA", 7)] == [
+        "2026-04-10",
+        "2026-04-15",
+    ]
+
+
+def test_empty_rates_cannot_replace_existing_data(tmp_path):
+    path = tmp_path / "rates.json"
+    store = JsonStore(path)
+    store.upsert_rates("2026-04-01", "VISA", {"USD": CurrencyRate(rate=32, reverse=1 / 32)})
+    before = path.read_bytes()
+    with pytest.raises(ValueError, match="empty"):
+        store.upsert_rates("2026-04-01", "VISA", {})
+    assert path.read_bytes() == before
+
+
+def test_failed_atomic_save_preserves_original_file(tmp_path):
+    path = tmp_path / "rates.json"
+    store = JsonStore(path)
+    store.upsert_rates("2026-04-01", "VISA", {"USD": CurrencyRate(rate=32, reverse=1 / 32)})
+    before = path.read_bytes()
+    with patch("fx_pulse.store.json_store.json.dump", side_effect=OSError("disk full")):
+        with pytest.raises(OSError):
+            store.upsert_rates("2026-04-02", "VISA", {"USD": CurrencyRate(rate=33, reverse=1 / 33)})
+    assert path.read_bytes() == before
+    assert list(tmp_path.glob(".rates-*.tmp")) == []
+
+
+@pytest.mark.parametrize("value", [0, -1, float("inf"), float("nan")])
+def test_currency_rate_rejects_nonpositive_and_nonfinite_values(value):
+    with pytest.raises(ValueError):
+        CurrencyRate(rate=value, reverse=1)
+    with pytest.raises(ValueError):
+        CurrencyRate(rate=1, reverse=value)

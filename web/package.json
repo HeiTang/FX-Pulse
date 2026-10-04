@@ -9,17 +9,26 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "check": "astro check",
+    "test": "node --import tsx --test tests/unit/*.test.ts",
+    "test:e2e": "playwright test",
+    "format:check": "prettier --check src tests astro.config.mjs playwright.config.ts tsconfig.json package.json .prettierrc.json"
   },
   "dependencies": {
-    "@astrojs/react": "^5.0.2",
     "@tailwindcss/vite": "^4.2.2",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "astro": "^6.1.1",
+    "astro": "^7.3.5",
     "echarts": "^6.0.0",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
     "tailwindcss": "^4.2.2"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^22.20.5",
+    "prettier": "^3.9.9",
+    "prettier-plugin-astro": "^1.1.0",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3"
   }
 }
