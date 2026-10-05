@@ -8,6 +8,7 @@ const dates = availableDates(ratesData.rates);
 const earliestDate = dates.at(0) ?? '';
 const latestDate = dates.at(-1) ?? '';
 const fetchedAt = formatFetchedAt(ratesData.meta.last_updated);
+const copyrightYear = new Date().getFullYear();
 ---
 
 <!doctype html>
@@ -269,7 +270,10 @@ const fetchedAt = formatFetchedAt(ratesData.meta.last_updated);
           ></div>
         </div>
         <p class="fine-print" id="conversion-note">
-          未計銀行手續費與回饋，非實際帳單。JCB 為交叉匯率估算。
+          <InfoIcon />
+          <span id="conversion-note-text">
+            未計銀行手續費與回饋，非實際帳單。JCB 為交叉匯率估算。
+          </span>
         </p>
       </section>
 
@@ -409,8 +413,11 @@ const fetchedAt = formatFetchedAt(ratesData.meta.last_updated);
     </main>
     <footer class="site-footer">
       <div class="shell footer-inner">
-        <span>資料來源：VISA / Mastercard / JCB · 非官方工具</span>
-        <span>資料檔更新時間：{fetchedAt}（台灣時間）</span>
+        <span>
+          資料來源：VISA / Mastercard / JCB · 非官方工具
+          <span class="footer-updated">更新時間：{fetchedAt}（台灣時間）</span>
+        </span>
+        <span>© {copyrightYear} HeiTang</span>
       </div>
     </footer>
 

@@ -568,6 +568,9 @@ summary span {
   font-size: 12px;
   color: #a1aec1;
 }
+.footer-updated::before {
+  content: ' · ';
+}
 .site-header {
   background: transparent;
 }
@@ -854,6 +857,7 @@ main.shell {
 }
 
 .shortcut-hint,
+#conversion-note,
 .period-footnote p {
   display: flex;
   align-items: flex-start;
@@ -1040,9 +1044,15 @@ main.shell {
   .footer-inner {
     display: block;
   }
-  .footer-inner span {
+  .footer-inner > span {
     display: block;
     margin-bottom: 7px;
+  }
+  .footer-updated {
+    display: block;
+  }
+  .footer-updated::before {
+    content: none;
   }
   .currency-shortcuts {
     padding-bottom: 14px;
@@ -1076,19 +1086,6 @@ main.shell {
   }
   .route-label {
     font-size: 12px;
-  }
-}
-@media (max-width: 400px) {
-  .period-comparison summary {
-    flex-wrap: wrap;
-  }
-  .period-comparison summary .period-summary-hint {
-    order: 3;
-    flex-basis: 100%;
-    margin-left: 0;
-  }
-  .period-chevron {
-    margin-left: auto;
   }
 }
 @media (max-width: 360px) {

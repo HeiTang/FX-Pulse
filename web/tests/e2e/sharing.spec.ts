@@ -147,5 +147,5 @@ test('invalid query parameters show errors and omitted values use defaults', asy
   await expect(page.locator('#amount')).toHaveValue('10,000');
   await expect(page.locator('#rate-date')).toHaveValue(dates.at(-1)!);
   await expect(page.locator('#query-message')).toBeEmpty();
-  await expect(page.locator('.site-footer')).toContainText('資料檔更新時間');
+  await expect(page.locator('.site-footer')).toContainText('更新時間');
 });

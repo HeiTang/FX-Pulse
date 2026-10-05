@@ -126,7 +126,7 @@ function renderResults() {
   setText('#total-heading', `換算${reverse ? currencies[code].name : '台幣'}`);
   setText('#difference-heading', reverse ? '與最高值的差額' : '與最低值的差額');
   setText(
-    '#conversion-note',
+    '#conversion-note-text',
     reverse
       ? '依刷卡參考匯率反推可換得金額，非銀行實際換匯報價；未計手續費與回饋。JCB 為交叉匯率估算。'
       : '未計銀行手續費與回饋，非實際帳單。JCB 為交叉匯率估算。',
