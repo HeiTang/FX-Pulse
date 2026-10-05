@@ -5,6 +5,7 @@ import {
   availableDates,
   fractionDigits,
   historyDates,
+  periodComparison,
   rateEntries,
   sources,
   validateAmount,
@@ -13,6 +14,64 @@ import {
   formatFetchedAt,
   type RateDays,
 } from '../../src/lib/rates';
+
+test('three-source comparison requires valid same-day same-currency rates and counts ties once', () => {
+  const entry = (rate: number) => ({ rate, reverse: 99 });
+  const day = (v: number, m: number, j: number): RateDays[string] => ({
+    VISA: { JPY: entry(v) },
+    Mastercard: { JPY: entry(m) },
+    JCB: { JPY: entry(j) },
+  });
+  const days: RateDays = {
+    '2026-01-01': { VISA: { JPY: entry(1) } },
+    '2026-01-02': { Mastercard: { JPY: entry(2) }, JCB: { JPY: entry(3) } },
+    '2026-01-03': { ...day(1, 2, 3), Mastercard: { USD: entry(2) } },
+    '2026-01-04': day(0, 1, 2),
+    '2026-01-05': day(1, 1, 0.5),
+    '2026-01-06': day(1, 2, 3),
+    '2026-01-07': day(3, 1, 2),
+    '2026-01-08': day(1, 1, 2),
+    '2026-01-09': day(1, 1, 1),
+    '2026-01-10': day(NaN, 1, 2),
+    '2026-01-11': day(1, Infinity, 2),
+    '2026-01-12': day(1, 2, -1),
+    invalid: day(1, 2, 3),
+  };
+  const dates = Object.keys(days);
+  assert.deepEqual(periodComparison(days, [...dates, '2026-01-05'], 'JPY'), {
+    count: 5,
+    bestDays: { VISA: 1, Mastercard: 1, JCB: 1 },
+    tied: 2,
+    median: 10000,
+    maximum: 20000,
+  });
+  assert.equal(
+    periodComparison(
+      days,
+      dates.filter((date) => date !== '2026-01-09'),
+      'JPY',
+    ).median,
+    15000,
+  );
+  assert.equal(periodComparison(days, ['2026-01-09'], 'JPY').median, 0);
+  assert.equal(periodComparison(days, dates, 'JPY', 100).median, 100);
+  const reversed = periodComparison(days, dates, 'JPY', 100, true);
+  assert.deepEqual(reversed.bestDays, { VISA: 1, Mastercard: 1, JCB: 1 });
+  assert.equal(reversed.tied, 2);
+  assert.ok(Math.abs(reversed.median! - (2 / 3) * 100) < 1e-8);
+  assert.equal(reversed.maximum, 100);
+  const invalidAmount = periodComparison(days, dates, 'JPY', null);
+  assert.equal(invalidAmount.count, 5);
+  assert.equal(invalidAmount.median, null);
+  assert.equal(invalidAmount.maximum, null);
+  assert.deepEqual(periodComparison(days, dates, 'EUR'), {
+    count: 0,
+    bestDays: { VISA: 0, Mastercard: 0, JCB: 0 },
+    tied: 0,
+    median: null,
+    maximum: null,
+  });
+});
 
 test('amount validation respects currency precision and grouping', () => {
   for (const code of ['JPY', 'KRW']) {

@@ -105,21 +105,6 @@ h2 {
 .route-destination {
   text-align: right;
 }
-.route-board .select-wrap {
-  width: 180px;
-}
-.route-board select {
-  width: 100%;
-  appearance: none;
-  border: 0;
-  background: transparent;
-  border-radius: 8px;
-  min-height: 44px;
-  padding: 0 26px 0 0;
-}
-.route-board .select-wrap:after {
-  right: 8px;
-}
 .route-destination > span:last-child {
   height: 44px;
   padding-top: 12px;
@@ -175,21 +160,6 @@ h2 {
 }
 .field-error:empty {
   display: none;
-}
-.select-wrap {
-  position: relative;
-}
-.select-wrap:after {
-  content: '';
-  position: absolute;
-  right: 13px;
-  top: 17px;
-  width: 7px;
-  height: 7px;
-  border-right: 1.5px solid #667477;
-  border-bottom: 1.5px solid #667477;
-  transform: rotate(45deg);
-  pointer-events: none;
 }
 #date-trigger {
   width: 100%;
@@ -378,9 +348,159 @@ h2 {
 .chart-note {
   line-height: 1.7;
 }
-.overview {
-  margin-top: 40px;
-  margin-bottom: 32px;
+.period-comparison {
+  --period-muted: #a1aec1;
+  --period-surface: #1c2735;
+  --period-accent: #c2eb74;
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.period-comparison summary {
+  min-height: 56px;
+  gap: 12px;
+  border-radius: 8px;
+  padding: 8px;
+  margin: 8px -8px 0;
+  transition: background-color 160ms ease;
+}
+.period-comparison summary:hover,
+.period-comparison summary:active {
+  background: var(--period-surface);
+}
+.period-comparison summary::after,
+.period-comparison[open] summary::after {
+  content: none;
+}
+.period-comparison summary span {
+  margin-left: 0;
+}
+.period-comparison .period-summary-title {
+  color: var(--navy);
+  font-size: 14px;
+  font-weight: 600;
+}
+.period-comparison summary .period-summary-hint {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--period-muted);
+}
+.period-chevron {
+  flex-shrink: 0;
+  color: var(--period-muted);
+  transition: transform 160ms ease;
+}
+.period-comparison[open] .period-chevron {
+  transform: rotate(180deg);
+}
+.period-content {
+  padding-top: 16px;
+}
+@media (max-width: 400px) {
+  .period-comparison summary {
+    flex-wrap: wrap;
+  }
+  .period-comparison summary .period-summary-hint {
+    order: 3;
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+  .period-chevron {
+    margin-left: auto;
+  }
+}
+.period-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin-bottom: 16px;
+}
+.period-context {
+  font-weight: 600;
+}
+.period-muted {
+  color: var(--period-muted);
+  font-size: 12px;
+}
+.period-grid {
+  display: grid;
+  gap: 16px;
+}
+.period-stats {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+.period-stats div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.period-stats dt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.period-stats dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.period-count-row {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.period-money {
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--period-surface);
+}
+.period-money .period-stats {
+  margin-top: 12px;
+}
+.period-stats .period-median-row {
+  flex-direction: column;
+  gap: 4px;
+}
+.period-median-row dd {
+  color: var(--period-accent);
+  font-size: 28px;
+  line-height: 1.3;
+  letter-spacing: -0.03em;
+}
+.period-maximum-row {
+  font-size: 12px;
+  color: var(--period-muted);
+}
+.period-message:empty {
+  display: none;
+}
+.period-message {
+  margin-top: 16px;
+}
+.period-footnote {
+  display: grid;
+  gap: 4px;
+  margin-top: 16px;
+  color: var(--period-muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+@media (min-width: 600px) {
+  .period-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .period-comparison summary,
+  .period-chevron {
+    transition: none;
+  }
 }
 summary {
   list-style: none;
@@ -400,37 +520,6 @@ summary:after {
 details[open] summary:after {
   content: '−';
 }
-.section-hint {
-  margin-bottom: 12px;
-}
-.overview-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  padding-bottom: 20px;
-}
-.currency-card {
-  text-align: left;
-  padding: 12px;
-}
-.card-code {
-  font-weight: 700;
-}
-.card-code small {
-  font-weight: 400;
-  margin-left: 8px;
-}
-.card-rate {
-  display: block;
-  font-size: 16px;
-  font-weight: 700;
-  margin-top: 6px;
-  font-variant-numeric: tabular-nums;
-}
-.card-source {
-  display: block;
-  margin-top: 3px;
-}
 .footer-inner {
   display: flex;
   justify-content: space-between;
@@ -444,10 +533,6 @@ details[open] summary:after {
   }
   .brand small {
     display: none;
-  }
-  .route-board .select-wrap {
-    width: 100%;
-    max-width: 140px;
   }
   .amount-wrap {
     min-height: 58px;
@@ -517,17 +602,9 @@ h1 {
   color: #1d2b20;
   font-size: 34px;
 }
-.route-board select,
 .route-destination > span:last-child {
   color: #c7d3e4;
   font-size: 16px;
-}
-.route-board .select-wrap:after {
-  border-color: #a1aec1;
-}
-.route-board select option {
-  background: #1c2735;
-  color: #e1e8f2;
 }
 .currency-shortcuts {
   border-bottom: 1px solid var(--line);
@@ -575,9 +652,6 @@ h1 {
 }
 .field .field-error {
   color: #ff9b9b;
-}
-.select-wrap:after {
-  border-color: #a1aec1;
 }
 h2 {
   font-size: 20px;
@@ -678,33 +752,9 @@ h2 {
 summary {
   min-height: 60px;
 }
-summary span,
-.section-hint {
+summary span {
   font-size: 12px;
   color: #a1aec1;
-}
-.currency-card {
-  background: #161e29;
-  border: 1px solid #354259;
-  color: #e1e8f2;
-  min-height: 104px;
-}
-.currency-card.active {
-  background: #253328;
-}
-.card-code {
-  font-size: 15px;
-}
-.card-code small,
-.card-source {
-  font-size: 12px;
-  color: #a1aec1;
-}
-.card-rate {
-  font:
-    500 19px ui-monospace,
-    Menlo,
-    monospace;
 }
 .footer-inner {
   font-size: 12px;
@@ -741,7 +791,6 @@ summary span,
   .route-destination > span {
     font-size: 12px;
   }
-  .route-board select,
   .route-destination > span:last-child {
     font-size: 15px;
   }
@@ -831,9 +880,6 @@ summary span,
   .source-filters button {
     font-size: 12px;
     padding-inline: 5px;
-  }
-  .overview-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .footer-inner {
     display: block;
@@ -946,13 +992,6 @@ summary span,
 .source-filters button {
   border-radius: 14px;
 }
-.currency-card {
-  border-radius: 20px;
-  border-color: transparent;
-}
-.currency-card.active {
-  border-color: #829b55;
-}
 @media (max-width: 760px) {
   .route-board {
     padding: 12px 0 22px;
@@ -1014,11 +1053,6 @@ summary span,
 .currency-shortcuts button {
   min-height: 80px;
 }
-.overview-flag {
-  font-size: 22px;
-  vertical-align: middle;
-  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;
-}
 @media (max-width: 760px) {
   .currency-shortcuts button {
     min-height: 70px;
@@ -1028,7 +1062,6 @@ summary span,
     margin-right: 2px;
   }
 }
-
 #date-trigger {
   display: flex;
   align-items: center;
@@ -1140,7 +1173,6 @@ summary span,
     height: 82px;
   }
 }
-
 main.shell {
   padding-top: 24px;
 }
@@ -1192,8 +1224,7 @@ main.shell {
     height: 16px;
   }
 }
-
-/* Keep the selected foreign currency editable on either side of the route. */
+/* Keep the direction control in the center of the route. */
 .route-arrow {
   border: 0;
   padding: 0;
@@ -1210,13 +1241,9 @@ main.shell {
 .route-board.is-reversed .currency-field {
   text-align: right;
 }
-.route-board.is-reversed .select-wrap {
-  margin-left: auto;
-}
 .route-board.is-reversed .route-destination {
   text-align: left;
 }
-
 .source-estimate {
   color: #a1aec1;
   font-size: 11px;
@@ -1233,4 +1260,78 @@ main.shell {
 }
 .result-rate {
   white-space: normal;
+}
+
+.route-label {
+  display: block;
+  font-size: 14px;
+  color: #a1aec1;
+}
+.route-name {
+  display: block;
+  min-height: 44px;
+  padding-top: 12px;
+  font-size: 15px;
+}
+.shortcut-hint {
+  margin: -6px 0 12px;
+  color: #a1aec1;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.currency-shortcuts button {
+  flex: 1 0 112px;
+  padding: 12px 8px;
+}
+.currency-shortcuts .shortcut-rate {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .currency-shortcuts button {
+    flex: 0 0 124px;
+  }
+  .route-label {
+    font-size: 12px;
+  }
+}
+
+.shortcut-hint,
+.period-footnote p {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.info-icon {
+  flex: 0 0 14px;
+  margin-top: 3px;
+}
+.route-name .route-flag {
+  font-size: 18px;
+  margin-right: 6px;
+}
+
+.currency-shortcuts .shortcut-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 0;
+}
+.currency-shortcuts .shortcut-heading strong,
+.currency-shortcuts .shortcut-heading .shortcut-name {
+  display: inline;
+  margin: 0;
+}
+.currency-shortcuts .shortcut-heading strong {
+  white-space: nowrap;
+}
+.currency-shortcuts .shortcut-heading .shortcut-name {
+  font-size: 11px;
 }

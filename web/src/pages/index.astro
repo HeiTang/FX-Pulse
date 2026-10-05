@@ -1,4 +1,5 @@
 ---
+import InfoIcon from '../components/InfoIcon.astro';
 import '../styles/global.css';
 import ratesData from '../data/rates.json';
 import { currencies, availableDates, formatFetchedAt } from '../lib/rates';
@@ -74,25 +75,19 @@ const fetchedAt = formatFetchedAt(ratesData.meta.last_updated);
 
       <div class="route-board">
         <div class="field currency-field">
-          <label for="currency">
-            <span id="route-flag" class="route-flag" aria-hidden="true">
-              🇯🇵
-            </span>{' '}
-            <span id="foreign-label">消費幣別</span>
-          </label>
+          <span class="route-label" id="foreign-label">
+            消費幣別
+          </span>
           <strong id="route-code" class="route-code">
             JPY
           </strong>
-          <div class="select-wrap">
-            <select id="currency" name="currency">
-              {ratesData.meta.currencies.map((code) => (
-                <option value={code} selected={code === 'JPY'}>
-                  {currencies[code]?.flag} {code} ·{' '}
-                  {currencies[code]?.name ?? code}
-                </option>
-              ))}
-            </select>
-          </div>
+          <span class="route-name">
+            <span id="route-flag" class="route-flag" aria-hidden="true">
+              🇯🇵
+            </span>
+            <span id="route-name">日圓</span>
+          </span>
+          <input id="currency" name="currency" type="hidden" value="JPY" />
         </div>
         <button
           type="button"
@@ -105,35 +100,46 @@ const fetchedAt = formatFetchedAt(ratesData.meta.last_updated);
           <span aria-hidden="true">↔</span>
         </button>
         <div class="route-destination">
-          <span>
+          <span id="twd-label">換算幣別</span>
+          <strong class="route-code">TWD</strong>
+          <span class="route-name">
             <span class="route-flag" aria-hidden="true">
               🇹🇼
-            </span>{' '}
-            <span id="twd-label">換算幣別</span>
+            </span>
+            <span>新台幣</span>
           </span>
-          <strong class="route-code">TWD</strong>
-          <span>新台幣</span>
         </div>
       </div>
       <section class="workspace" aria-label="外幣消費試算">
         <div class="currency-shortcuts" role="group" aria-label="快速選擇幣別">
-          {['JPY', 'USD', 'KRW', 'EUR', 'GBP', 'HKD', 'AUD', 'SGD']
-            .filter((code) => ratesData.meta.currencies.includes(code))
-            .map((code) => (
-              <button
-                type="button"
-                data-quick-currency={code}
-                aria-pressed={code === 'JPY'}
-                aria-label={`${currencies[code]?.name ?? code} ${code}`}
-              >
-                <span class="currency-flag" aria-hidden="true">
-                  {currencies[code]?.flag ?? '🌐'}
-                </span>
+          {ratesData.meta.currencies.map((code) => (
+            <button
+              type="button"
+              data-quick-currency={code}
+              aria-pressed={code === 'JPY'}
+              aria-label={`${currencies[code]?.name ?? code} ${code}`}
+            >
+              <span class="currency-flag" aria-hidden="true">
+                {currencies[code]?.flag ?? '🌐'}
+              </span>
+              <span class="shortcut-heading">
                 <strong>{code}</strong>
-                <span>{currencies[code]?.name ?? code}</span>
-              </button>
-            ))}
+                <span class="shortcut-name">
+                  {currencies[code]?.name ?? code}
+                </span>
+              </span>
+              <span class="shortcut-rate" data-shortcut-rate>
+                —
+              </span>
+            </button>
+          ))}
         </div>
+        <p class="shortcut-hint" id="shortcut-hint">
+          <InfoIcon />
+          <span id="shortcut-hint-text">
+            每 1 外幣 → TWD · 最低參考匯率 · 所選日期
+          </span>
+        </p>
         <div class="input-panel">
           <div class="field amount-field">
             <label id="amount-label" for="amount">
@@ -306,38 +312,99 @@ const fetchedAt = formatFetchedAt(ratesData.meta.last_updated);
           <p class="chart-note" id="chart-note">
             1 外幣 = TWD · 截至所選日期 · 線段可能跨過缺資料日
           </p>
+          <details class="period-comparison">
+            <summary>
+              <span class="period-summary-title">期間統計</span>
+              <span id="period-sources-hint" class="period-summary-hint">
+                卡組織匯率比較
+              </span>
+              <svg
+                class="period-chevron"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path d="m6 9 6 6 6-6"></path>
+              </svg>
+            </summary>
+            <div class="period-content">
+              <div class="period-heading">
+                <p id="period-context" class="period-context"></p>
+                <p id="period-dates" class="period-muted"></p>
+              </div>
+              <div class="period-grid">
+                <div class="period-days">
+                  <dl class="period-stats">
+                    <div class="period-count-row">
+                      <dt>同日可比較</dt>
+                      <dd id="period-count"></dd>
+                    </div>
+                    <div>
+                      <dt>
+                        <i class="legend-dot visa" aria-hidden="true"></i>
+                        <span id="period-visa-label">VISA 最低</span>
+                      </dt>
+                      <dd id="period-visa"></dd>
+                    </div>
+                    <div>
+                      <dt>
+                        <i class="legend-dot mastercard" aria-hidden="true"></i>
+                        <span id="period-mastercard-label">
+                          Mastercard 最低
+                        </span>
+                      </dt>
+                      <dd id="period-mastercard"></dd>
+                    </div>
+                    <div>
+                      <dt>
+                        <i class="legend-dot jcb" aria-hidden="true"></i>
+                        <span id="period-jcb-label">JCB 最低（估算）</span>
+                      </dt>
+                      <dd id="period-jcb"></dd>
+                    </div>
+                    <div class="period-muted">
+                      <dt id="period-tied-label">最低並列</dt>
+                      <dd id="period-tied"></dd>
+                    </div>
+                  </dl>
+                </div>
+                <div class="period-money">
+                  <p id="period-amount" class="period-muted"></p>
+                  <dl class="period-stats">
+                    <div class="period-median-row">
+                      <dt>每日最高與最低差額中位數</dt>
+                      <dd id="period-median"></dd>
+                    </div>
+                    <div class="period-maximum-row">
+                      <dt>最大差額</dt>
+                      <dd id="period-maximum"></dd>
+                    </div>
+                  </dl>
+                </div>
+              </div>
+              <p id="period-message" class="period-message" role="status"></p>
+              <div class="period-footnote">
+                <p>
+                  <InfoIcon />
+                  <span>
+                    只比較同日、同幣別且三家都有資料的日期；JCB
+                    為估算，並列另計。
+                  </span>
+                </p>
+                <p>
+                  <InfoIcon />
+                  <span>
+                    差額＝每日最高－最低，含並列日；同步試算金額與方向，未計手續費與回饋。
+                  </span>
+                </p>
+              </div>
+            </div>
+          </details>
         </div>
-      </section>
-
-      <section class="overview" aria-labelledby="overview-title">
-        <details>
-          <summary>
-            <h2 id="overview-title">其他幣別</h2>
-            <span>{ratesData.meta.currencies.length} 種幣別參考匯率</span>
-          </summary>
-          <p class="section-hint" id="overview-hint">
-            每 1 外幣的最低參考匯率；點選可帶入試算。
-          </p>
-          <div id="overview-grid" class="overview-grid">
-            {ratesData.meta.currencies.map((code) => (
-              <button type="button" class="currency-card" data-currency={code}>
-                <span class="card-code">
-                  <span class="overview-flag" aria-hidden="true">
-                    {currencies[code]?.flag}
-                  </span>{' '}
-                  {code}
-                  <small>{currencies[code]?.name}</small>
-                </span>
-                <span class="card-rate" data-card-rate={code}>
-                  —
-                </span>
-                <span class="card-source" data-card-source={code}>
-                  暫無資料
-                </span>
-              </button>
-            ))}
-          </div>
-        </details>
       </section>
     </main>
     <footer class="site-footer">
