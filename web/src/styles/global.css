@@ -18,8 +18,7 @@ body {
   min-width: 320px;
 }
 button,
-input,
-select {
+input {
   font: inherit;
 }
 button {
@@ -35,7 +34,6 @@ p {
 }
 button:focus-visible,
 input:focus-visible,
-select:focus-visible,
 a:focus-visible,
 summary:focus-visible {
   outline: 3px solid #99b2ff;
@@ -87,7 +85,6 @@ h2 {
   position: relative;
   z-index: 1;
 }
-.route-board .field label,
 .route-destination > span {
   display: block;
   letter-spacing: 0.02em;
@@ -115,18 +112,12 @@ h2 {
   overflow-x: auto;
   scrollbar-width: thin;
 }
-.currency-shortcuts strong {
-  display: block;
-  font-size: 13px;
-  font-weight: 750;
-}
 .currency-shortcuts span {
   display: block;
   margin-top: 2px;
 }
 .input-panel {
   display: grid;
-  border-bottom: 1px solid var(--line);
 }
 .field label {
   display: block;
@@ -148,10 +139,7 @@ h2 {
   border: 0;
   background: transparent;
   outline: 0;
-  font-size: 40px;
-  font-weight: 700;
   text-align: right;
-  font-variant-numeric: tabular-nums;
 }
 .field small {
   display: block;
@@ -265,8 +253,6 @@ h2 {
   min-width: 0;
 }
 .result-total strong {
-  font-size: 25px;
-  font-weight: 650;
   overflow-wrap: anywhere;
 }
 .result-rate {
@@ -368,10 +354,6 @@ h2 {
 .period-comparison summary:hover,
 .period-comparison summary:active {
   background: var(--period-surface);
-}
-.period-comparison summary::after,
-.period-comparison[open] summary::after {
-  content: none;
 }
 .period-comparison summary span {
   margin-left: 0;
@@ -512,14 +494,6 @@ summary {
 summary span {
   margin-left: auto;
 }
-summary:after {
-  content: '＋';
-  font-size: 18px;
-  color: var(--navy);
-}
-details[open] summary:after {
-  content: '−';
-}
 .footer-inner {
   display: flex;
   justify-content: space-between;
@@ -582,10 +556,6 @@ h1 {
   font-size: 18px;
   letter-spacing: 0;
 }
-.route-board {
-  border-bottom: 1px solid #354259;
-}
-.route-board .field label,
 .route-destination > span {
   color: #a1aec1;
   font-size: 13px;
@@ -606,15 +576,9 @@ h1 {
   color: #c7d3e4;
   font-size: 16px;
 }
-.currency-shortcuts {
-  border-bottom: 1px solid var(--line);
-}
 .currency-shortcuts button {
-  flex: 1 0 78px;
-  border-bottom: 2px solid transparent;
   color: #a1aec1;
   font-size: 14px;
-  padding: 9px 12px;
 }
 .currency-shortcuts strong {
   font:
@@ -624,9 +588,6 @@ h1 {
 }
 .currency-shortcuts span {
   font-size: 12px;
-}
-.currency-shortcuts button[aria-pressed='true'] {
-  border-bottom-color: #c2eb74;
 }
 .input-panel {
   grid-template-columns: 2fr 1fr;
@@ -787,15 +748,11 @@ summary span {
   .route-arrow {
     font-size: 28px;
   }
-  .route-board .field label,
   .route-destination > span {
     font-size: 12px;
   }
   .route-destination > span:last-child {
     font-size: 15px;
-  }
-  .currency-shortcuts span {
-    display: none;
   }
   .input-panel {
     grid-template-columns: 1fr;
@@ -950,7 +907,6 @@ summary span {
   border: 0;
   border-radius: 16px;
   background: #1c2532;
-  flex-basis: 78px;
 }
 .currency-shortcuts button[aria-pressed='true'] {
   border: 0;
@@ -1005,7 +961,6 @@ summary span {
     gap: 6px;
   }
   .currency-shortcuts button {
-    flex: 0 0 62px;
     border-radius: 14px;
   }
   .input-panel {
