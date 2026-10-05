@@ -7,6 +7,7 @@ import {
   availableDates,
   fractionDigits,
   historyDates,
+  periodComparison,
   rateEntries,
   validRate,
   validDate,
@@ -17,16 +18,16 @@ import {
 } from './rates';
 const rateDays: RateDays = ratesData.rates;
 const dates = availableDates(rateDays);
-const currency = document.querySelector<HTMLSelectElement>('#currency')!;
+const currency = document.querySelector<HTMLInputElement>('#currency')!;
 const amount = document.querySelector<HTMLInputElement>('#amount')!;
 const rateDate = document.querySelector<HTMLInputElement>('#rate-date')!;
 const results = document.querySelector<HTMLElement>('#results')!;
 const chartEl = document.querySelector<HTMLElement>('#chart')!;
 const params = new URLSearchParams(location.search);
 const requestedCurrency = params.get('currency');
-const supportedCurrency = Array.from(currency.options).some(
-  (option) => option.value === requestedCurrency,
-);
+const supportedCurrency =
+  requestedCurrency !== null &&
+  ratesData.meta.currencies.includes(requestedCurrency);
 if (supportedCurrency) currency.value = requestedCurrency!;
 if (params.has('amount')) amount.value = params.get('amount')!;
 const requestedDate = params.get('date');
@@ -82,6 +83,9 @@ const formatMoney = (value: number, code: string) =>
     maximumFractionDigits: fractionDigits(code),
   }).format(value);
 const unit = (code: string) => (code === 'TWD' ? 'NT$' : code);
+const shortcutRateFormat = new Intl.NumberFormat('zh-TW', {
+  maximumSignificantDigits: 4,
+});
 const rateFormat = (n: number) => (n < 1 ? n.toFixed(6) : n.toFixed(4));
 const setText = (selector: string, value: string) => {
   document.querySelector<HTMLElement>(selector)!.textContent = value;
@@ -122,12 +126,13 @@ function renderResults() {
   setText('#total-heading', `換算${reverse ? currencies[code].name : '台幣'}`);
   setText('#difference-heading', reverse ? '與最高值的差額' : '與最低值的差額');
   setText(
-    '#conversion-note',
+    '#conversion-note-text',
     reverse
       ? '依刷卡參考匯率反推可換得金額，非銀行實際換匯報價；未計手續費與回饋。JCB 為交叉匯率估算。'
       : '未計銀行手續費與回饋，非實際帳單。JCB 為交叉匯率估算。',
   );
   setText('#route-code', code);
+  setText('#route-name', currencies[code]?.name ?? code);
   setText('#route-flag', currencies[code]?.flag ?? '');
   const error = document.querySelector<HTMLElement>('#amount-error')!;
   error.textContent = amountError();
@@ -225,31 +230,79 @@ function renderResults() {
         : '',
   );
 }
-function renderOverview() {
+function renderCurrencyShortcuts() {
   setText(
-    '#overview-hint',
+    '#shortcut-hint-text',
     reverse
-      ? '每 1 TWD 可換得的最高參考外幣金額；點選可帶入試算。'
-      : '每 1 外幣的最低參考匯率；點選可帶入試算。',
+      ? '每 1 TWD 可換得的最高參考外幣金額 · 所選日期'
+      : '每 1 外幣 → TWD · 最低參考匯率 · 所選日期',
   );
   for (const button of document.querySelectorAll<HTMLButtonElement>(
-    '.currency-card',
+    '[data-quick-currency]',
   )) {
-    const code = button.dataset.currency!;
+    const code = button.dataset.quickCurrency!;
     const available = entries(code, rateDate.value).sort((a, b) =>
       reverse ? b.rate - a.rate : a.rate - b.rate,
     );
-    button.classList.toggle('active', code === currency.value);
     button.setAttribute('aria-pressed', String(code === currency.value));
-    button.querySelector<HTMLElement>('[data-card-rate]')!.textContent =
-      available.length
-        ? `${reverse ? code : 'NT$'} ${rateFormat(available[0].rate)}`
-        : '—';
-    button.querySelector<HTMLElement>('[data-card-source]')!.textContent =
-      available.length
-        ? `${available[0].src} · 1 ${reverse ? 'TWD' : code}`
-        : '此日期無資料';
+    const best = available[0];
+    const rateText = best
+      ? `${best.src === 'JCB' ? '約 ' : ''}${shortcutRateFormat.format(best.rate)}`
+      : '—';
+    button.querySelector<HTMLElement>('[data-shortcut-rate]')!.textContent =
+      rateText;
+    button.setAttribute(
+      'aria-label',
+      `${currencies[code]?.name ?? code} ${code}，每 1 ${reverse ? 'TWD' : code} 可換得 ${reverse ? code : 'TWD'} ${rateText}，${best ? `${best.src}${best.src === 'JCB' ? '（估算）' : ''}` : '此日期無資料'}`,
+    );
   }
+}
+function renderPeriodComparison(
+  visibleDates = historyDates(dates, rateDate.value, range),
+) {
+  const code = currency.value;
+  const value = validAmount();
+  const comparison = periodComparison(
+    rateDays,
+    visibleDates,
+    code,
+    value,
+    reverse,
+  );
+  const from = inputCode();
+  const to = reverse ? code : 'TWD';
+  const qualifier = reverse ? '可換最多' : '最低';
+  setText(
+    '#period-context',
+    `${range === 'all' ? '全部期間' : `近 ${range} 天`} · ${code} · 三家比較`,
+  );
+  setText('#period-dates', `截至 ${rateDate.value}`);
+  setText('#period-count', `${comparison.count} 天`);
+  for (const src of sources) {
+    setText(
+      `#period-${src.toLowerCase()}-label`,
+      `${src} ${qualifier}${src === 'JCB' ? '（估算）' : ''}`,
+    );
+    setText(`#period-${src.toLowerCase()}`, `${comparison.bestDays[src]} 天`);
+  }
+  setText('#period-tied-label', reverse ? '最多並列' : '最低並列');
+  setText('#period-tied', `${comparison.tied} 天`);
+  setText(
+    '#period-amount',
+    value === null
+      ? '請輸入有效金額以比較差額'
+      : `換算 ${formatMoney(value, from)} ${from} → ${to}`,
+  );
+  const differenceText = (difference: number | null) =>
+    difference === null ? '—' : `約 ${unit(to)} ${formatMoney(difference, to)}`;
+  setText('#period-median', differenceText(comparison.median));
+  setText('#period-maximum', differenceText(comparison.maximum));
+  setText(
+    '#period-message',
+    comparison.count === 0
+      ? '所選期間沒有同日、同幣別且三家都有有效匯率的資料。'
+      : '',
+  );
 }
 async function renderChart() {
   const version = ++chartVersion;
@@ -263,6 +316,7 @@ async function renderChart() {
     `1 ${from} = ${to} · 截至所選日期 · 線段可能跨過缺資料日`,
   );
   const visibleDates = historyDates(dates, rateDate.value, range);
+  renderPeriodComparison(visibleDates);
   const visibleSources = source === 'all' ? sources : [source];
   const hasEnough = visibleSources.some(
     (src) =>
@@ -355,16 +409,8 @@ async function renderChart() {
 }
 function render() {
   renderResults();
-  renderOverview();
+  renderCurrencyShortcuts();
   renderChart();
-  document
-    .querySelectorAll<HTMLButtonElement>('[data-quick-currency]')
-    .forEach((button) =>
-      button.setAttribute(
-        'aria-pressed',
-        String(button.dataset.quickCurrency === currency.value),
-      ),
-    );
 }
 document
   .querySelectorAll<HTMLButtonElement>('[data-quick-currency]')
@@ -425,9 +471,14 @@ swap.addEventListener('click', () => {
     ),
   ];
 });
-currency.addEventListener('change', render);
-amount.addEventListener('input', renderResults);
-amount.addEventListener('focus', () => amount.select());
+amount.addEventListener('input', () => {
+  renderResults();
+  renderPeriodComparison();
+});
+amount.addEventListener('focus', () => {
+  if (validAmount() !== null) amount.value = amount.value.replaceAll(',', '');
+  amount.select();
+});
 amount.addEventListener('blur', () => {
   const value = validAmount();
   if (value !== null)
@@ -435,6 +486,7 @@ amount.addEventListener('blur', () => {
       maximumFractionDigits: fractionDigits(inputCode()),
     }).format(value);
   renderResults();
+  renderPeriodComparison();
 });
 amount.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') amount.blur();
@@ -471,18 +523,6 @@ document
           item.setAttribute('aria-pressed', String(item === button)),
         );
       renderChart();
-    }),
-  );
-document
-  .querySelectorAll<HTMLButtonElement>('.currency-card')
-  .forEach((button) =>
-    button.addEventListener('click', () => {
-      currency.value = button.dataset.currency!;
-      render();
-      document.querySelector('.workspace')?.scrollIntoView({
-        behavior: reducedMotion.matches ? 'auto' : 'smooth',
-        block: 'start',
-      });
     }),
   );
 const chartObserver = new ResizeObserver(() => chart?.resize());

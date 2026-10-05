@@ -3,6 +3,8 @@ import AxeBuilder from '@axe-core/playwright';
 import ratesData from '../../src/data/rates.json' with { type: 'json' };
 import {
   availableDates,
+  historyDates,
+  periodComparison,
   rateEntries,
   type RateDays,
 } from '../../src/lib/rates';
@@ -23,6 +25,127 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator('.result-row')).toHaveCount(3);
 });
 
+test('three-source comparison follows period, currency and cutoff', async ({
+  page,
+}) => {
+  const panel = page.locator('.period-comparison');
+  await expect(panel).not.toHaveAttribute('open', '');
+  await panel.locator('summary').click();
+  await expect(page.locator('#period-pair')).toHaveCount(0);
+  for (const range of ['7', '30', 'all'] as const) {
+    await page.locator(`[data-range="${range}"]`).click();
+    for (const code of ['JPY', 'USD']) {
+      await page.locator(`[data-quick-currency=${code}]`).click();
+      const result = periodComparison(
+        days,
+        historyDates(dates, latest, range),
+        code,
+      );
+      await expect(page.locator('#period-context')).toHaveText(
+        `${range === 'all' ? '全部期間' : `近 ${range} 天`} · ${code} · 三家比較`,
+      );
+      await expect(page.locator('#period-count')).toHaveText(
+        `${result.count} 天`,
+      );
+      for (const src of ['VISA', 'Mastercard', 'JCB'] as const)
+        await expect(page.locator(`#period-${src.toLowerCase()}`)).toHaveText(
+          `${result.bestDays[src]} 天`,
+        );
+      await expect(page.locator('#period-tied')).toHaveText(
+        `${result.tied} 天`,
+      );
+      await expect(page.locator('#period-median')).toHaveText(
+        result.median === null ? '—' : `約 NT$ ${fmt.format(result.median)}`,
+      );
+      await expect(page.locator('#period-maximum')).toHaveText(
+        result.maximum === null ? '—' : `約 NT$ ${fmt.format(result.maximum)}`,
+      );
+    }
+  }
+  const median = await page.locator('#period-median').textContent();
+  await page.locator('[data-source="JCB"]').click();
+  await expect(page.locator('#period-median')).toHaveText(median!);
+  await page.locator('#rate-date').evaluate((element, date) => {
+    (element as HTMLInputElement).value = date;
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+  }, dates[0]);
+  await expect(page.locator('#period-dates')).toHaveText(`截至 ${dates[0]}`);
+  await expect(page.locator('#period-count')).toHaveText(
+    `${periodComparison(days, [dates[0]], 'USD').count} 天`,
+  );
+  await page.goto('/?date=1900-01-01');
+  await page.locator('.period-comparison summary').click();
+  await expect(page.locator('#period-count')).toHaveText('0 天');
+  await expect(page.locator('#period-median')).toHaveText('—');
+  await expect(page.locator('#period-message')).toContainText('三家');
+});
+
+test('three-source comparison follows amount and direction with estimate labels', async ({
+  page,
+}) => {
+  await page.locator('.period-comparison summary').click();
+  await page.locator('[data-range="30"]').click();
+  for (const amount of [20000, 30000]) {
+    await page.locator('#amount').fill(String(amount));
+    const result = periodComparison(
+      days,
+      historyDates(dates, latest, '30'),
+      'JPY',
+      amount,
+    );
+    await expect(page.locator('#period-median')).toHaveText(
+      result.median === null ? '—' : `約 NT$ ${fmt.format(result.median)}`,
+    );
+    await expect(page.locator('#period-maximum')).toHaveText(
+      result.maximum === null ? '—' : `約 NT$ ${fmt.format(result.maximum)}`,
+    );
+  }
+  await expect(page.locator('#period-jcb-label')).toHaveText(
+    'JCB 最低（估算）',
+  );
+  await expect(page.locator('#period-amount')).toHaveText(
+    '換算 30,000 JPY → TWD',
+  );
+  await page.locator('#amount').fill('');
+  await expect(page.locator('#period-median')).toHaveText('—');
+  await expect(page.locator('#period-maximum')).toHaveText('—');
+  await expect(page.locator('#period-amount')).toContainText('請輸入有效金額');
+  await page.locator('#amount').fill('30000');
+  await page.locator('#swap-direction').click();
+  const reversed = periodComparison(
+    days,
+    historyDates(dates, latest, '30'),
+    'JPY',
+    30000,
+    true,
+  );
+  const jpy = new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 0 });
+  await expect(page.locator('#period-median')).toHaveText(
+    reversed.median === null ? '—' : `約 JPY ${jpy.format(reversed.median)}`,
+  );
+  for (const src of ['VISA', 'Mastercard', 'JCB'] as const)
+    await expect(page.locator(`#period-${src.toLowerCase()}`)).toHaveText(
+      `${reversed.bestDays[src]} 天`,
+    );
+  await expect(page.locator('#period-mastercard-label')).toHaveText(
+    'Mastercard 可換最多',
+  );
+  await expect(page.locator('#period-jcb-label')).toHaveText(
+    'JCB 可換最多（估算）',
+  );
+  await expect(page.locator('#period-tied-label')).toHaveText('最多並列');
+  await expect(page.locator('#period-amount')).toHaveText(
+    '換算 30,000.00 TWD → JPY',
+  );
+  const audit = await new AxeBuilder({ page }).analyze();
+  expect(audit.violations.map((item) => item.id)).toEqual([]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});
+
 test('same-day amounts and differences match stored data across all currencies', async ({
   page,
 }) => {
@@ -32,7 +155,7 @@ test('same-day amounts and differences match stored data across all currencies',
   }, comparable);
   await page.locator('#amount').fill('10000');
   for (const code of ratesData.meta.currencies) {
-    await page.locator('#currency').selectOption(code);
+    await page.locator(`[data-quick-currency=${code}]`).click();
     const entries = rateEntries(days, code, comparable);
     const min = Math.min(...entries.map((entry) => entry.rate * 10000));
     for (const entry of entries) {
@@ -64,7 +187,7 @@ test('invalid amounts show errors; valid inputs recover and precision follows cu
     await expect(page.locator('#amount-error')).not.toBeEmpty();
     await expect(page.locator('.result-total').first()).toHaveText('—');
   }
-  await page.locator('#currency').selectOption('USD');
+  await page.locator(`[data-quick-currency=${'USD'}]`).click();
   await amount.fill('123.45');
   await expect(amount).toHaveAttribute('aria-invalid', 'false');
   await expect(page.locator('#amount-error')).toBeEmpty();
@@ -73,6 +196,79 @@ test('invalid amounts show errors; valid inputs recover and precision follows cu
   await amount.fill('10000');
   await amount.blur();
   await expect(amount).toHaveValue('10,000');
+});
+
+test('formatted amounts become plain digits while editing and stay valid after deletion', async ({
+  page,
+}) => {
+  const amount = page.locator('#amount');
+  await amount.fill('1000');
+  await amount.blur();
+  await expect(amount).toHaveValue('1,000');
+  await amount.focus();
+  await expect(amount).toHaveValue('1000');
+  await amount.press('ArrowRight');
+  await amount.press('Backspace');
+  await expect(amount).toHaveValue('100');
+  await expect(amount).toHaveAttribute('aria-invalid', 'false');
+  await expect(page.locator('#amount-error')).toBeEmpty();
+  await expect(page.locator('#period-amount')).toHaveText('換算 100 JPY → TWD');
+  await amount.blur();
+  await expect(amount).toHaveValue('100');
+
+  await page.locator(`[data-quick-currency=${'USD'}]`).click();
+  await amount.fill('1234.56');
+  await amount.blur();
+  await expect(amount).toHaveValue('1,234.56');
+  await amount.focus();
+  await expect(amount).toHaveValue('1234.56');
+  await amount.press('ArrowRight');
+  await amount.press('Backspace');
+  await expect(amount).toHaveValue('1234.5');
+  await expect(amount).toHaveAttribute('aria-invalid', 'false');
+  await amount.blur();
+  await expect(amount).toHaveValue('1,234.5');
+});
+
+test('currency shortcuts replace duplicate controls and show same-day reference rates in both directions', async ({
+  page,
+}) => {
+  await expect(page.locator('[data-quick-currency]')).toHaveCount(
+    ratesData.meta.currencies.length,
+  );
+  await expect(page.locator('#overview-grid, .select-wrap')).toHaveCount(0);
+  for (const date of [latest, comparable]) {
+    await page.locator('#rate-date').evaluate((element, value) => {
+      (element as HTMLInputElement).value = value;
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+    }, date);
+    for (const reverse of [false, true]) {
+      for (const code of ratesData.meta.currencies) {
+        const candidates = rateEntries(days, code, date, reverse).sort(
+          (a, b) => (reverse ? b.rate - a.rate : a.rate - b.rate),
+        );
+        const best = candidates[0];
+        const button = page.locator(`[data-quick-currency="${code}"]`);
+        const rate = best
+          ? new Intl.NumberFormat('zh-TW', {
+              maximumSignificantDigits: 4,
+            }).format(best.rate)
+          : '';
+        await expect(button.locator('[data-shortcut-rate]')).toHaveText(
+          best ? `${best.src === 'JCB' ? '約 ' : ''}${rate}` : '—',
+        );
+        await expect(button.locator('[data-shortcut-source]')).toHaveCount(0);
+        await expect(button.locator('.shortcut-heading strong')).toHaveText(
+          code,
+        );
+        await expect(button.locator('.shortcut-heading')).toHaveCSS(
+          'display',
+          'flex',
+        );
+      }
+      await page.locator('#swap-direction').click();
+    }
+  }
 });
 
 test('calendar disables absent dates and supports keyboard selection and escape', async ({
@@ -111,7 +307,7 @@ test('calendar disables absent dates and supports keyboard selection and escape'
   await expect(page.locator('#chart-placeholder')).toBeVisible();
 });
 
-test('rapid chart filters, currency shortcuts and overview retain the final selection', async ({
+test('rapid chart filters, currency shortcuts retain the final selection', async ({
   page,
 }) => {
   for (const code of ['USD', 'KRW', 'JPY'])
@@ -129,8 +325,7 @@ test('rapid chart filters, currency shortcuts and overview retain the final sele
     'aria-pressed',
     'true',
   );
-  await page.locator('summary').click();
-  await page.locator('.currency-card[data-currency="EUR"]').click();
+  await page.locator('[data-quick-currency="EUR"]').click();
   await expect(page.locator('#currency')).toHaveValue('EUR');
   await expect(page.locator('#chart-title')).toHaveText('EUR / TWD');
 });
@@ -173,8 +368,7 @@ test('layout, assets and accessibility remain usable including large totals and 
     'rgb(17, 23, 32)',
   );
   await page.locator('#amount').fill('1000000000');
-  await page.locator('#currency').selectOption('GBP');
-  await page.locator('summary').click();
+  await page.locator(`[data-quick-currency=${'GBP'}]`).click();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -218,7 +412,7 @@ test('direction switch preserves input and compares foreign budget amounts for e
   await expect(page.locator('#amount-code')).toHaveText('TWD');
   await expect(page.locator('#amount-label')).toHaveText('台幣預算');
   for (const code of ratesData.meta.currencies) {
-    await page.locator('#currency').selectOption(code);
+    await page.locator(`[data-quick-currency=${code}]`).click();
     const format = new Intl.NumberFormat('zh-TW', {
       style: 'currency',
       currency: code,
@@ -249,7 +443,7 @@ test('direction switch preserves input and compares foreign budget amounts for e
     );
     await expect(page.locator('#chart-title')).toHaveText(`TWD / ${code}`);
   }
-  await page.locator('#currency').selectOption('JPY');
+  await page.locator(`[data-quick-currency=${'JPY'}]`).click();
   await page.locator('#swap-direction').press('Enter');
   await expect(page.locator('#swap-direction')).toBeFocused();
   await expect(page.locator('#swap-direction')).toHaveAttribute(
@@ -265,7 +459,7 @@ test('direction switch preserves input and compares foreign budget amounts for e
   );
 });
 
-test('reverse mode handles missing data, rapid switches, overview and mobile accessibility', async ({
+test('reverse mode handles missing data, rapid switches, shortcuts and mobile accessibility', async ({
   page,
 }) => {
   await page.locator('#swap-direction').click();
@@ -306,9 +500,8 @@ test('reverse mode handles missing data, rapid switches, overview and mobile acc
   const twd = (await page.locator('.route-destination').boundingBox())!;
   expect(twd.x).toBeLessThan(swap.x);
   expect(foreign.x).toBeGreaterThan(swap.x);
-  await page.locator('summary').click();
-  await expect(page.locator('#overview-hint')).toContainText('每 1 TWD');
-  await page.locator('.currency-card[data-currency="USD"]').click();
+  await expect(page.locator('#shortcut-hint')).toContainText('每 1 TWD');
+  await page.locator('[data-quick-currency="USD"]').click();
   await expect(page.locator('#comparison-context')).toHaveText('TWD → USD');
   expect(
     await page.evaluate(

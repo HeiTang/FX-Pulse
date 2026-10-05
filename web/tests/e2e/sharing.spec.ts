@@ -64,7 +64,7 @@ test('edits replace URL conditions without navigation or history entries and ret
     history.replaceState({ marker: 'preserved' }, '', location.href);
     return { length: history.length, timeOrigin: performance.timeOrigin };
   });
-  await page.locator('#currency').selectOption('EUR');
+  await page.locator(`[data-quick-currency=${'EUR'}]`).click();
   await page.locator('#amount').fill('200.25');
   await page.locator('#swap-direction').click();
   await page.locator('#rate-date').evaluate((element, date) => {
@@ -147,5 +147,5 @@ test('invalid query parameters show errors and omitted values use defaults', asy
   await expect(page.locator('#amount')).toHaveValue('10,000');
   await expect(page.locator('#rate-date')).toHaveValue(dates.at(-1)!);
   await expect(page.locator('#query-message')).toBeEmpty();
-  await expect(page.locator('.site-footer')).toContainText('資料檔更新時間');
+  await expect(page.locator('.site-footer')).toContainText('更新時間');
 });

@@ -93,6 +93,47 @@ export function formatFetchedAt(value: string): string {
   }).format(date);
 }
 
+export function periodComparison(
+  days: RateDays,
+  dates: string[],
+  code: string,
+  amount: number | null = 10_000,
+  reverse = false,
+) {
+  const bestDays: Record<Source, number> = { VISA: 0, Mastercard: 0, JCB: 0 };
+  let tied = 0;
+  const differences: number[] = [];
+  for (const date of new Set(dates)) {
+    if (!validDate(date)) continue;
+    const entries = rateEntries(days, code, date, reverse);
+    if (entries.length !== sources.length) continue;
+    const rates = entries.map((entry) => entry.rate);
+    const lowest = Math.min(...rates);
+    const highest = Math.max(...rates);
+    const best = reverse ? highest : lowest;
+    const winners = entries.filter((entry) => entry.rate === best);
+    if (winners.length === 1) bestDays[winners[0].src]++;
+    else tied++;
+    differences.push(highest - lowest);
+  }
+  differences.sort((a, b) => a - b);
+  const count = differences.length;
+  const middle = Math.floor(count / 2);
+  return {
+    count,
+    bestDays,
+    tied,
+    median:
+      count && validRate(amount)
+        ? count % 2
+          ? differences[middle] * amount
+          : ((differences[middle - 1] + differences[middle]) / 2) * amount
+        : null,
+    maximum:
+      count && validRate(amount) ? differences[count - 1] * amount : null,
+  };
+}
+
 const digits = new Map<string, number>();
 export function fractionDigits(code: string): number {
   if (!digits.has(code))
