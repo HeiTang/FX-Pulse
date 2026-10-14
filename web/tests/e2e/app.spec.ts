@@ -362,6 +362,7 @@ test('layout, assets and accessibility remain usable including large totals and 
       failures.push(`${response.status()} ${response.url()}`);
   });
   await page.reload();
+  await page.locator('#chart').scrollIntoViewIfNeeded();
   await expect(page.locator('#chart canvas')).toHaveCount(1);
   await expect(page.locator('html')).toHaveCSS(
     'background-color',

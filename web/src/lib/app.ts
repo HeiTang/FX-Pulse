@@ -75,6 +75,7 @@ let source: Source | 'all' = 'all';
 let chart: ReturnType<typeof import('./chart').createChart> | null = null;
 let chartModule: Promise<typeof import('./chart')> | null = null;
 let chartVersion = 0;
+let chartReady = false;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 const formatMoney = (value: number, code: string) =>
@@ -337,6 +338,7 @@ async function renderChart() {
     chart?.clear();
     return;
   }
+  if (!chartReady) return;
   try {
     chartModule ??= import('./chart');
     const { createChart } = await chartModule;
@@ -527,4 +529,14 @@ document
   );
 const chartObserver = new ResizeObserver(() => chart?.resize());
 chartObserver.observe(chartEl);
+const chartVisibilityObserver = new IntersectionObserver(
+  (entries) => {
+    if (!entries.some((entry) => entry.isIntersecting)) return;
+    chartReady = true;
+    chartVisibilityObserver.disconnect();
+    renderChart();
+  },
+  { rootMargin: '200px' },
+);
+chartVisibilityObserver.observe(chartEl.closest('.history-panel')!);
 render();
