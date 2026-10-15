@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 :root {
+  scrollbar-gutter: stable;
   font-family:
     -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang TC',
     'Microsoft JhengHei', sans-serif;
