@@ -142,10 +142,13 @@ h2 {
 .currency-shortcuts {
   display: flex;
   overflow-x: auto;
-  scrollbar-width: thin;
+  scrollbar-width: none;
   border: 0;
   gap: 8px;
   padding: 0 0 18px;
+}
+.currency-shortcuts::-webkit-scrollbar {
+  display: none;
 }
 .currency-shortcuts span {
   display: block;
