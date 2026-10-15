@@ -178,6 +178,8 @@ h2 {
 }
 .amount-wrap > span {
   font-weight: 700;
+  flex: 0 0 3ch;
+  font-family: ui-monospace, Menlo, monospace;
 }
 .amount-wrap input {
   width: 100%;
@@ -604,6 +606,8 @@ summary span {
 .comparison-context {
   font-size: 13px;
   color: #a1aec1;
+  flex: 0 0 7em;
+  text-align: right;
 }
 .result-headline,
 .result-details {
@@ -1135,6 +1139,13 @@ main.shell {
   }
 }
 @media (min-width: 761px) {
+  .result-row {
+    /* Reserve wrapped totals before shared query parameters are applied. */
+    min-height: calc(2 * 26px * 1.2 + 36px);
+  }
+  .result-total strong {
+    line-height: 1.2;
+  }
   .date-field {
     display: block;
   }
@@ -1146,6 +1157,11 @@ main.shell {
   }
   #date-trigger {
     height: 82px;
+  }
+}
+@media (min-width: 761px) and (max-width: 1000px) {
+  .result-row {
+    min-height: calc(3 * 26px * 1.2 + 36px);
   }
 }
 @media (prefers-reduced-motion: reduce) {
