@@ -1,4 +1,5 @@
 ---
+import { resultRows } from '../lib/results';
 import InfoIcon from '../components/InfoIcon.astro';
 import '../styles/global.css';
 import ratesData from '../data/rates.json';
@@ -263,7 +264,44 @@ const copyrightYear = new Date().getFullYear();
             <span id="total-heading">換算台幣</span>
             <span id="difference-heading">與最低值的差額</span>
           </div>
-          <div id="results" class="results" aria-live="polite"></div>
+          <div id="results" class="results" aria-live="polite">
+            {resultRows(ratesData.rates, 'JPY', latestDate, 10000).map(
+              (row) => (
+                <div class:list={['result-row', { 'is-best': row.best }]}>
+                  <div class="result-headline">
+                    <div class="result-source">
+                      <span class="source-icon" aria-hidden="true">
+                        <img
+                          src={`/icons/${row.src.toLowerCase()}.svg`}
+                          alt=""
+                        />
+                      </span>
+                      <strong>{row.src}</strong>
+                      {row.src === 'JCB' && (
+                        <span class="source-estimate">交叉匯率估算</span>
+                      )}
+                    </div>
+                    <div class="result-total">
+                      <strong>{row.totalText}</strong>
+                    </div>
+                  </div>
+                  <div class="result-details">
+                    <div class="result-rate">
+                      <span>{row.rateText}</span>
+                    </div>
+                    <div
+                      class:list={[
+                        'result-difference',
+                        { 'best-badge': row.best },
+                      ]}
+                    >
+                      {row.differenceText}
+                    </div>
+                  </div>
+                </div>
+              ),
+            )}
+          </div>
           <div
             id="comparison-message"
             class="comparison-message"
