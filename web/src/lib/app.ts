@@ -166,6 +166,7 @@ function renderResults() {
     row.append(headline, details);
     results.append(row);
   }
+  results.dispatchEvent(new Event('resultschange'));
   setText(
     '#comparison-message',
     available.length === 0

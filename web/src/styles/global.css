@@ -1004,8 +1004,11 @@ main.shell {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    flex-wrap: wrap;
     gap: 8px;
+  }
+  .results.is-stacked .result-headline {
+    flex-direction: column;
+    align-items: stretch;
   }
   .result-details {
     display: flex;
@@ -1017,6 +1020,7 @@ main.shell {
   }
   .result-source {
     flex-shrink: 0;
+    flex-wrap: nowrap;
     font-size: 15px;
     gap: 7px;
   }
@@ -1027,6 +1031,13 @@ main.shell {
   .result-total strong {
     font-size: 26px;
     line-height: 1.5;
+    white-space: nowrap;
+  }
+  .results.is-stacked .result-total {
+    max-width: 100%;
+  }
+  .results.is-stacked .result-total strong {
+    white-space: normal;
   }
   .result-rate {
     font-size: 13px;
@@ -1115,9 +1126,6 @@ main.shell {
   .result-source {
     font-size: 14px;
     gap: 5px;
-  }
-  .result-total strong {
-    font-size: 23px;
   }
   .result-rate {
     font-size: 13px;
