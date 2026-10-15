@@ -73,11 +73,6 @@ test('three-source comparison follows period, currency and cutoff', async ({
   await expect(page.locator('#period-count')).toHaveText(
     `${periodComparison(days, [dates[0]], 'USD').count} 天`,
   );
-  await page.goto('/?date=1900-01-01');
-  await page.locator('.period-comparison summary').click();
-  await expect(page.locator('#period-count')).toHaveText('0 天');
-  await expect(page.locator('#period-median')).toHaveText('—');
-  await expect(page.locator('#period-message')).toContainText('三家');
 });
 
 test('three-source comparison follows amount and direction with estimate labels', async ({

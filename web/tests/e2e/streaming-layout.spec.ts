@@ -83,7 +83,7 @@ test('shared desktop page stays stable when streamed HTML starts overflowing', a
     }).observe({ type: 'layout-shift', buffered: true });
   });
   await page.goto(
-    `${origin}/?currency=KRW&amount=1000000000&date=2026-10-14&direction=twd-to-foreign`,
+    `${origin}/?currency=KRW&amount=1000000000&direction=twd-to-foreign`,
     { waitUntil: 'commit' },
   );
   try {
