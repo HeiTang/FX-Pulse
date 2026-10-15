@@ -40,7 +40,7 @@ for (const scenario of scenarios) {
       await gate;
       await route.continue();
     });
-    await page.goto(`/?${new URLSearchParams({ ...scenario, date: latest })}`, {
+    await page.goto(`/?${new URLSearchParams(scenario)}`, {
       waitUntil: 'commit',
     });
     try {

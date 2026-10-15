@@ -11,7 +11,6 @@ import {
   periodComparison,
   rateEntries,
   validRate,
-  validDate,
   conversionRate,
   validateAmount,
   type Source,
@@ -31,18 +30,6 @@ const supportedCurrency =
   ratesData.meta.currencies.includes(requestedCurrency);
 if (supportedCurrency) currency.value = requestedCurrency!;
 if (params.has('amount')) amount.value = params.get('amount')!;
-const requestedDate = params.get('date');
-if (requestedDate !== null) {
-  if (validDate(requestedDate)) {
-    rateDate.value = requestedDate;
-    if (!dates.includes(requestedDate))
-      document.querySelector<HTMLElement>('#date-error')!.textContent =
-        '此日期無資料';
-  } else {
-    document.querySelector<HTMLElement>('#date-error')!.textContent =
-      '連結日期無效，請使用 YYYY-MM-DD。';
-  }
-}
 let selectedDate = rateDate.value;
 mountDatePicker(rateDate, dates);
 let reverse = params.get('direction') === 'twd-to-foreign';
@@ -93,7 +80,7 @@ function syncQuery() {
   const url = new URL(location.href);
   url.searchParams.set('currency', currency.value);
   url.searchParams.set('amount', amount.value);
-  url.searchParams.set('date', rateDate.value);
+  url.searchParams.delete('date');
   url.searchParams.set(
     'direction',
     reverse ? 'twd-to-foreign' : 'foreign-to-twd',
@@ -179,6 +166,7 @@ function renderResults() {
     row.append(headline, details);
     results.append(row);
   }
+  results.dispatchEvent(new Event('resultschange'));
   setText(
     '#comparison-message',
     available.length === 0
