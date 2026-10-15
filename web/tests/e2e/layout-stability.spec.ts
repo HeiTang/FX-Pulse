@@ -1,10 +1,16 @@
 import { test, expect } from '@playwright/test';
 
+declare global {
+  interface Window {
+    layoutShiftScore: number;
+  }
+}
+
 test('initial results preserve layout while the app script is delayed', async ({
   page,
 }, testInfo) => {
   await page.addInitScript(() => {
-    const state = window as Window & { layoutShiftScore: number };
+    const state = window;
     state.layoutShiftScore = 0;
     new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
@@ -62,9 +68,7 @@ test('initial results preserve layout while the app script is delayed', async ({
         Math.abs(after[selector].height - before[selector].height),
       ).toBeLessThan(1);
     }
-    const cls = await page.evaluate(
-      () => (window as Window & { layoutShiftScore: number }).layoutShiftScore,
-    );
+    const cls = await page.evaluate(() => window.layoutShiftScore);
     expect(cls).toBe(0);
     await testInfo.attach('initial-layout', {
       body: JSON.stringify({ before, after, cls }),
