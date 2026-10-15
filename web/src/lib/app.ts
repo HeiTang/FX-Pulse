@@ -1,3 +1,4 @@
+import { formatMoney, unit, rateFormat, resultRows } from './results';
 import ratesData from '../data/rates.json';
 import { mountDatePicker } from './date-picker';
 import {
@@ -78,16 +79,9 @@ let chartVersion = 0;
 let chartReady = false;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-const formatMoney = (value: number, code: string) =>
-  new Intl.NumberFormat('zh-TW', {
-    minimumFractionDigits: fractionDigits(code),
-    maximumFractionDigits: fractionDigits(code),
-  }).format(value);
-const unit = (code: string) => (code === 'TWD' ? 'NT$' : code);
 const shortcutRateFormat = new Intl.NumberFormat('zh-TW', {
   maximumSignificantDigits: 4,
 });
-const rateFormat = (n: number) => (n < 1 ? n.toFixed(6) : n.toFixed(4));
 const setText = (selector: string, value: string) => {
   document.querySelector<HTMLElement>(selector)!.textContent = value;
 };
@@ -113,11 +107,6 @@ function renderResults() {
   const available = entries(code, rateDate.value);
   const from = inputCode();
   const to = reverse ? code : 'TWD';
-  const bestValue = available.length
-    ? (reverse ? Math.max : Math.min)(
-        ...available.map((item) => item.rate * (value ?? 1)),
-      )
-    : null;
   setText('#comparison-context', `${from} → ${to}`);
   setText('#amount-code', from);
   setText('#amount-label', reverse ? '台幣預算' : '消費金額');
@@ -140,15 +129,13 @@ function renderResults() {
   amount.inputMode = fractionDigits(from) === 0 ? 'numeric' : 'decimal';
   amount.setAttribute('aria-invalid', String(value === null));
   results.replaceChildren();
-  for (const src of sources) {
-    const rate = available.find((item) => item.src === src)?.rate;
-    const converted =
-      value !== null && rate !== undefined ? value * rate : null;
-    const best =
-      converted !== null &&
-      bestValue !== null &&
-      Math.abs(converted - bestValue) < 0.0000001 &&
-      available.length > 1;
+  for (const { src, best, rateText, totalText, differenceText } of resultRows(
+    rateDays,
+    code,
+    rateDate.value,
+    value,
+    reverse,
+  )) {
     const row = document.createElement('div');
     row.className = `result-row${best ? ' is-best' : ''}`;
     const label = document.createElement('div');
@@ -172,46 +159,16 @@ function renderResults() {
     const rateCell = document.createElement('div');
     rateCell.className = 'result-rate';
     const rateNumber = document.createElement('span');
-    rateNumber.textContent =
-      rate === undefined
-        ? src === 'JCB' &&
-          [0, 6].includes(new Date(`${rateDate.value}T00:00:00Z`).getUTCDay())
-          ? '此日期無資料；目前抓取策略略過週末'
-          : '此日期無資料'
-        : `1 ${from} = ${rateFormat(rate)} ${to}`;
+    rateNumber.textContent = rateText;
     rateCell.append(rateNumber);
     const total = document.createElement('div');
     total.className = 'result-total';
     const totalNumber = document.createElement('strong');
-    totalNumber.textContent =
-      converted === null
-        ? '—'
-        : `${src === 'JCB' ? '約 ' : ''}${unit(to)} ${formatMoney(converted, to)}`;
+    totalNumber.textContent = totalText;
     total.append(totalNumber);
     const difference = document.createElement('div');
     difference.className = 'result-difference';
-    const gap =
-      converted !== null && bestValue !== null
-        ? Math.abs(converted - bestValue)
-        : null;
-    const smallestUnit = 10 ** -fractionDigits(to);
-    const sign = reverse ? '−' : '+';
-    difference.textContent =
-      converted === null
-        ? '—'
-        : best
-          ? reverse
-            ? src === 'JCB'
-              ? '最高參考可換得金額（估算）'
-              : '最高可換得金額'
-            : src === 'JCB'
-              ? '最低參考換算額（估算）'
-              : '最低換算額'
-          : gap === null || available.length < 2
-            ? '無法比較'
-            : gap < smallestUnit / 2
-              ? `${sign} 小於 ${unit(to)} ${formatMoney(smallestUnit, to)}`
-              : `${sign} ${unit(to)} ${formatMoney(gap, to)}`;
+    difference.textContent = differenceText;
     if (best) difference.classList.add('best-badge');
     const headline = document.createElement('div');
     headline.className = 'result-headline';
