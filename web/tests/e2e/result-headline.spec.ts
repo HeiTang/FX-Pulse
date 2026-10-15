@@ -71,8 +71,10 @@ test('headlines recalculate together after resize and amount changes', async ({
   await expectLayout(page, false);
   await page.setViewportSize({ width: 390, height: 844 });
   await expectLayout(page, true);
-  await page.locator('#amount').fill('1');
+  await page.setViewportSize({ width: 480, height: 844 });
   await expectLayout(page, false);
-  await page.locator('#amount').fill('10000');
+  await page.locator('#amount').fill('1000000000');
   await expectLayout(page, true);
+  await page.locator('#amount').fill('10000');
+  await expectLayout(page, false);
 });
