@@ -95,7 +95,7 @@ jobs:
       - run: npm run check
       - run: npm run format:check
       - run: npm test
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:e2e
       - name: Upload browser test report
         if: failure()
