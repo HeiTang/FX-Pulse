@@ -64,6 +64,12 @@ test('edits replace URL conditions without navigation or history entries and ret
     (element as HTMLInputElement).value = date;
     element.dispatchEvent(new Event('change', { bubbles: true }));
   }, dates[0]);
+  await expect(page).toHaveURL(
+    (url) =>
+      url.searchParams.get('direction') === 'twd-to-foreign' &&
+      url.searchParams.get('amount') === '200.25' &&
+      url.searchParams.get('currency') === 'EUR',
+  );
   let url = new URL(page.url());
   expect(Object.fromEntries(url.searchParams)).toEqual({
     currency: 'EUR',
@@ -82,12 +88,16 @@ test('edits replace URL conditions without navigation or history entries and ret
     marker: 'preserved',
   });
   await page.locator('#amount').fill('1,00');
+  await expect(page).toHaveURL(
+    (url) => url.searchParams.get('amount') === '1,00',
+  );
   url = new URL(page.url());
   expect(url.searchParams.get('amount')).toBe('1,00');
   await page.reload();
   await expect(page.locator('#amount')).toHaveValue('1,00');
   await expect(page.locator('#amount')).toHaveAttribute('aria-invalid', 'true');
   await page.locator('#amount').fill('');
+  await expect(page).toHaveURL((url) => url.searchParams.get('amount') === '');
   expect(new URL(page.url()).searchParams.get('amount')).toBe('');
   await page.reload();
   await expect(page.locator('#amount')).toHaveValue('');

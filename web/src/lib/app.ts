@@ -76,7 +76,10 @@ const amountError = () => validateAmount(amount.value, inputCode()).error;
 const validAmount = () => validateAmount(amount.value, inputCode()).value;
 const entries = (code: string, day: string) =>
   rateEntries(rateDays, code, day, reverse);
+let queryTimer: number | undefined;
+let lastQuerySync = -Infinity;
 function syncQuery() {
+  clearTimeout(queryTimer);
   const url = new URL(location.href);
   url.searchParams.set('currency', currency.value);
   url.searchParams.set('amount', amount.value);
@@ -85,7 +88,15 @@ function syncQuery() {
     'direction',
     reverse ? 'twd-to-foreign' : 'foreign-to-twd',
   );
-  if (url.href !== location.href) history.replaceState(history.state, '', url);
+  if (url.href === location.href) return;
+  // Safari limits history writes; coalesce rapid edits without delaying results.
+  const delay = 250 - (performance.now() - lastQuerySync);
+  if (delay > 0) {
+    queryTimer = window.setTimeout(syncQuery, delay);
+    return;
+  }
+  history.replaceState(history.state, '', url);
+  lastQuerySync = performance.now();
 }
 function renderResults() {
   syncQuery();

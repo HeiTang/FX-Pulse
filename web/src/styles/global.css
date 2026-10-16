@@ -286,7 +286,8 @@ h2 {
   align-items: center;
   position: relative;
   grid-template-areas: 'source rate total difference';
-  min-height: 78px;
+  /* Reserve wrapped totals before shared query parameters are applied. */
+  min-height: calc(2 * 26px * 1.2 + 36px);
   font-variant-numeric: tabular-nums;
   padding: 18px 0;
   grid-template-columns: 1fr 1.4fr 1.4fr 1fr;
@@ -326,6 +327,7 @@ h2 {
     monospace;
   color: #e1e8f2;
   letter-spacing: -0.065em;
+  line-height: 1.2;
 }
 .result-rate {
   grid-area: rate;
@@ -349,6 +351,7 @@ h2 {
   color: #a1aec1;
 }
 .comparison-panel {
+  container: comparison / inline-size;
   background: #161e29;
   border-radius: 24px;
   padding: 22px 24px;
@@ -988,64 +991,10 @@ main.shell {
   #date-trigger {
     min-height: 46px;
   }
-  .table-head {
-    display: none;
-  }
   .comparison-panel,
   .history-panel {
     padding: 20px 16px;
     border-radius: 20px;
-  }
-  .result-row {
-    display: block;
-    padding: 16px 0;
-  }
-  .result-headline {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-  }
-  .results.is-stacked .result-headline {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .result-details {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    align-items: baseline;
-    flex-wrap: wrap;
-    margin-top: 8px;
-  }
-  .result-source {
-    flex-shrink: 0;
-    flex-wrap: nowrap;
-    font-size: 15px;
-    gap: 7px;
-  }
-  .result-total {
-    min-width: 0;
-    margin-left: auto;
-  }
-  .result-total strong {
-    font-size: 26px;
-    line-height: 1.5;
-    white-space: nowrap;
-  }
-  .results.is-stacked .result-total {
-    max-width: 100%;
-  }
-  .results.is-stacked .result-total strong {
-    white-space: normal;
-  }
-  .result-rate {
-    font-size: 13px;
-    letter-spacing: 0;
-  }
-  .result-difference {
-    margin-left: auto;
-    font-size: 12px;
   }
   .fine-print {
     font-size: 12px;
@@ -1107,6 +1056,63 @@ main.shell {
     font-size: 12px;
   }
 }
+@container comparison (max-width: 960px) {
+  .table-head {
+    display: none;
+  }
+  .result-row {
+    display: block;
+    min-height: 78px;
+    padding: 16px 0;
+  }
+  .result-headline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .results.is-stacked .result-headline {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .result-details {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    align-items: baseline;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .result-source {
+    flex-shrink: 0;
+    flex-wrap: nowrap;
+    font-size: 15px;
+    gap: 7px;
+  }
+  .result-total {
+    min-width: 0;
+    margin-left: auto;
+  }
+  .result-total strong {
+    font-size: 26px;
+    line-height: 1.5;
+    white-space: nowrap;
+  }
+  .results.is-stacked .result-total {
+    max-width: 100%;
+  }
+  .results.is-stacked .result-total strong {
+    white-space: normal;
+  }
+  .result-rate {
+    font-size: 13px;
+    letter-spacing: 0;
+  }
+  .result-difference {
+    margin-left: auto;
+    font-size: 12px;
+  }
+}
 @media (max-width: 360px) {
   .shell {
     width: calc(100% - 28px);
@@ -1151,13 +1157,6 @@ main.shell {
   }
 }
 @media (min-width: 761px) {
-  .result-row {
-    /* Reserve wrapped totals before shared query parameters are applied. */
-    min-height: calc(2 * 26px * 1.2 + 36px);
-  }
-  .result-total strong {
-    line-height: 1.2;
-  }
   .date-field {
     display: block;
   }
@@ -1169,11 +1168,6 @@ main.shell {
   }
   #date-trigger {
     height: 82px;
-  }
-}
-@media (min-width: 761px) and (max-width: 1000px) {
-  .result-row {
-    min-height: calc(3 * 26px * 1.2 + 36px);
   }
 }
 @media (prefers-reduced-motion: reduce) {

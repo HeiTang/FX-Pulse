@@ -2,6 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests/e2e',
+  testIgnore: '**/mobile-layout.spec.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
@@ -34,6 +35,12 @@ export default defineConfig({
     },
     { name: 'compact', use: { viewport: { width: 680, height: 900 } } },
     { name: 'tablet', use: { viewport: { width: 768, height: 1024 } } },
+    ...(['chromium', 'webkit'] as const).map((browserName) => ({
+      name: `mobile-layout-${browserName}`,
+      testMatch: '**/mobile-layout.spec.ts',
+      testIgnore: [],
+      use: { browserName, channel: undefined, isMobile: true, hasTouch: true },
+    })),
   ],
   webServer: {
     command:
