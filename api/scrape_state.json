@@ -1,8 +1,8 @@
 {
   "sources": {
     "VISA": {
-      "consecutive_blocks": 1,
-      "next_retry_at": "2026-10-26T09:38:46.056011Z"
+      "consecutive_blocks": 2,
+      "next_retry_at": "2026-10-26T22:00:37.771333Z"
     }
   }
 }
