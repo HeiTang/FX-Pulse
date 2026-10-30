@@ -1,3 +1,4 @@
+import { trackCalculation } from './analytics';
 import { formatMoney, unit, rateFormat, resultRows } from './results';
 import ratesData from '../data/rates.json';
 import { mountDatePicker } from './date-picker';
@@ -76,6 +77,23 @@ const amountError = () => validateAmount(amount.value, inputCode()).error;
 const validAmount = () => validateAmount(amount.value, inputCode()).value;
 const entries = (code: string, day: string) =>
   rateEntries(rateDays, code, day, reverse);
+let calculationTimer: number | undefined;
+const calculationKey = () =>
+  [currency.value, validAmount(), rateDate.value, reverse].join(':');
+let lastCalculation = calculationKey();
+function recordCalculation() {
+  clearTimeout(calculationTimer);
+  if (
+    !window.gtag ||
+    validAmount() === null ||
+    entries(currency.value, rateDate.value).length === 0
+  )
+    return;
+  const key = calculationKey();
+  if (key === lastCalculation) return;
+  lastCalculation = key;
+  trackCalculation(currency.value, reverse);
+}
 let queryTimer: number | undefined;
 let lastQuerySync = -Infinity;
 function syncQuery() {
@@ -376,6 +394,7 @@ document
     button.addEventListener('click', () => {
       currency.value = button.dataset.quickCurrency!;
       render();
+      recordCalculation();
     }),
   );
 let swapAnimations: Animation[] = [];
@@ -391,6 +410,7 @@ swap.addEventListener('click', () => {
   reverse = !reverse;
   syncDirection();
   render();
+  recordCalculation();
   swap.focus({ preventScroll: true });
   if (reducedMotion.matches) return;
   const timing = { duration: 240, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)' };
@@ -432,6 +452,8 @@ swap.addEventListener('click', () => {
 amount.addEventListener('input', () => {
   renderResults();
   renderPeriodComparison();
+  clearTimeout(calculationTimer);
+  calculationTimer = window.setTimeout(recordCalculation, 800);
 });
 amount.addEventListener('focus', () => {
   if (validAmount() !== null) amount.value = amount.value.replaceAll(',', '');
@@ -445,6 +467,7 @@ amount.addEventListener('blur', () => {
     }).format(value);
   renderResults();
   renderPeriodComparison();
+  recordCalculation();
 });
 amount.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') amount.blur();
@@ -458,6 +481,7 @@ rateDate.addEventListener('change', () => {
   selectedDate = rateDate.value;
   setText('#date-error', '');
   render();
+  recordCalculation();
 });
 document.querySelectorAll<HTMLButtonElement>('[data-range]').forEach((button) =>
   button.addEventListener('click', () => {

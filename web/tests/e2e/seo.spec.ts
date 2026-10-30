@@ -1,9 +1,11 @@
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import astroConfig from '../../astro.config.mjs';
 import ratesData from '../../src/data/rates.json' with { type: 'json' };
 import { availableDates, rateEntries } from '../../src/lib/rates';
 
 const latest = availableDates(ratesData.rates).at(-1)!;
+const site = new URL('/', astroConfig.site).origin;
 
 for (const [path, code, name] of [
   ['/', 'JPY', '外幣'],
@@ -13,22 +15,26 @@ for (const [path, code, name] of [
   test(`${path} has crawlable content and share metadata without JavaScript`, async ({
     browser,
     request,
+    baseURL,
   }) => {
-    const context = await browser.newContext({ javaScriptEnabled: false });
+    const context = await browser.newContext({
+      javaScriptEnabled: false,
+      baseURL,
+    });
     const page = await context.newPage();
     try {
-      await page.goto(`http://127.0.0.1:4322${path}`);
+      await page.goto(path);
       await expect(page).toHaveTitle(
         `${name}刷卡匯率比較與試算｜VISA、Mastercard、JCB — FX Pulse`,
       );
       await expect(page.locator('h1')).toHaveText(`${name}刷卡匯率比較與試算`);
       await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
         'href',
-        `https://fx.purr.tw${path}`,
+        `${site}${path}`,
       );
       await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
         'content',
-        `https://fx.purr.tw${path}`,
+        `${site}${path}`,
       );
       await expect(page.locator('meta[name="description"]')).toHaveAttribute(
         'content',
@@ -41,7 +47,7 @@ for (const [path, code, name] of [
       const image = await page
         .locator('meta[property="og:image"]')
         .getAttribute('content');
-      expect(image).toBe('https://fx.purr.tw/og/fx-pulse.png');
+      expect(image).toBe(`${site}/og/fx-pulse.png`);
       const response = await request.get('/og/fx-pulse.png');
       expect(response.ok()).toBe(true);
       const png = await response.body();
@@ -95,7 +101,7 @@ test('USD page keeps its default on reload and query links can override it', asy
   await expect(page.locator('.rate-history caption')).toContainText('美元');
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
     'href',
-    'https://fx.purr.tw/usd/',
+    `${site}/usd/`,
   );
   const results = await new AxeBuilder({ page }).analyze();
   expect(results.violations).toEqual([]);
@@ -105,6 +111,17 @@ test('sitemap lists all three canonical pages', async ({ request }) => {
   const response = await request.get('/sitemap.xml');
   expect(response.ok()).toBe(true);
   const xml = await response.text();
+  expect(xml.match(/<loc>/g)).toHaveLength(3);
   for (const path of ['/', '/jpy/', '/usd/'])
-    expect(xml).toContain(`<loc>https://fx.purr.tw${path}</loc>`);
+    expect(xml).toContain(`<loc>${site}${path}</loc>`);
+});
+
+test('robots allows crawling and points to the configured sitemap', async ({
+  request,
+}) => {
+  const response = await request.get('/robots.txt');
+  expect(response.ok()).toBe(true);
+  expect(await response.text()).toBe(
+    `User-agent: *\nAllow: /\n\nSitemap: ${site}/sitemap.xml\n`,
+  );
 });

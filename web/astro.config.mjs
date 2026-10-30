@@ -3,6 +3,8 @@ import { defineConfig } from 'astro/config';
 
 import tailwindcss from '@tailwindcss/vite';
 
+export const gaMeasurementId = 'G-4CXCX1QQP7';
+
 // https://astro.build/config
 export default defineConfig({
   site: 'https://fx.purr.tw',
@@ -13,5 +15,8 @@ export default defineConfig({
 
   vite: {
     plugins: [tailwindcss()],
+    define: {
+      __GA_MEASUREMENT_ID__: JSON.stringify(gaMeasurementId),
+    },
   },
 });
