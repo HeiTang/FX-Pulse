@@ -111,6 +111,17 @@ test('sitemap lists all three canonical pages', async ({ request }) => {
   const response = await request.get('/sitemap.xml');
   expect(response.ok()).toBe(true);
   const xml = await response.text();
+  expect(xml.match(/<loc>/g)).toHaveLength(3);
   for (const path of ['/', '/jpy/', '/usd/'])
     expect(xml).toContain(`<loc>${site}${path}</loc>`);
+});
+
+test('robots allows crawling and points to the configured sitemap', async ({
+  request,
+}) => {
+  const response = await request.get('/robots.txt');
+  expect(response.ok()).toBe(true);
+  expect(await response.text()).toBe(
+    `User-agent: *\nAllow: /\n\nSitemap: ${site}/sitemap.xml\n`,
+  );
 });
