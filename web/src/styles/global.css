@@ -36,7 +36,8 @@ p {
 button:focus-visible,
 input:focus-visible,
 a:focus-visible,
-summary:focus-visible {
+summary:focus-visible,
+.rate-history:focus-visible {
   outline: 3px solid #99b2ff;
   outline-offset: 3px;
 }
@@ -1181,4 +1182,78 @@ main.shell {
     scroll-behavior: auto !important;
     transition: none !important;
   }
+}
+
+.page-intro {
+  margin-bottom: 24px;
+}
+.page-intro h1 {
+  font-size: clamp(20px, 3vw, 28px);
+  margin-bottom: 8px;
+}
+.page-intro p,
+.rate-guide p {
+  color: #a1aec1;
+  line-height: 1.8;
+}
+.page-intro nav {
+  font-size: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 12px;
+}
+.page-intro a,
+.rate-guide a {
+  color: #a9c5ff;
+  text-underline-offset: 4px;
+}
+.page-intro a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.page-intro a[aria-current='page'] {
+  color: #e1e8f2;
+  font-weight: 700;
+}
+.rate-guide {
+  padding-block: 24px;
+  border-top: 1px solid var(--line);
+}
+.rate-guide h2,
+.rate-guide p {
+  margin-bottom: 12px;
+}
+.rate-guide summary {
+  cursor: pointer;
+  padding-block: 12px;
+}
+.rate-history {
+  overflow-x: auto;
+  margin-top: 20px;
+}
+.rate-history table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.rate-history caption {
+  text-align: left;
+  padding-bottom: 12px;
+  line-height: 1.8;
+}
+.rate-history th,
+.rate-history td {
+  padding: 12px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  white-space: nowrap;
+}
+.rate-history th:first-child {
+  text-align: left;
+}
+.rate-history p {
+  margin-top: 12px;
+  font-size: 13px;
 }
