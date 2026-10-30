@@ -3,12 +3,43 @@ import { resultRows } from '../lib/results';
 import InfoIcon from '../components/InfoIcon.astro';
 import '../styles/global.css';
 import ratesData from '../data/rates.json';
-import { currencies, availableDates, formatFetchedAt } from '../lib/rates';
+import {
+  currencies,
+  availableDates,
+  formatFetchedAt,
+  rateEntries,
+} from '../lib/rates';
 
+interface Props {
+  defaultCurrency?: 'JPY' | 'USD';
+  currencyPage?: boolean;
+}
+const { defaultCurrency = 'JPY', currencyPage = false } = Astro.props;
+const currencyInfo = currencies[defaultCurrency];
+const heading = currencyPage
+  ? `${currencyInfo.name}刷卡匯率比較與試算`
+  : '外幣刷卡匯率比較與試算';
+const title = `${heading}｜VISA、Mastercard、JCB — FX Pulse`;
+const description = currencyPage
+  ? `比較 ${currencyInfo.name}（${defaultCurrency}）兌台幣的 VISA、Mastercard 與 JCB 參考匯率，查看歷史資料並試算刷卡金額。JCB 為交叉匯率估算，未計銀行手續費與回饋。`
+  : '比較 VISA、Mastercard 與 JCB 的外幣刷卡參考匯率，支援日圓、美元等 8 種幣別，查看歷史走勢並試算台幣金額。JCB 為交叉匯率估算，未計銀行手續費與回饋。';
+const canonical = new URL(
+  currencyPage ? `/${defaultCurrency.toLowerCase()}/` : '/',
+  Astro.site,
+).href;
+const shareImage = new URL('/og/fx-pulse.png', Astro.site).href;
 const dates = availableDates(ratesData.rates);
 const earliestDate = dates.at(0) ?? '';
 const latestDate = dates.at(-1) ?? '';
 const fetchedAt = formatFetchedAt(ratesData.meta.last_updated);
+const jcbDate = dates.findLast((date) =>
+  rateEntries(ratesData.rates, defaultCurrency, date).some(
+    (entry) => entry.src === 'JCB',
+  ),
+);
+const jcbSource = jcbDate
+  ? `https://www.jcb.jp/rate/usd${jcbDate.slice(5, 7)}${jcbDate.slice(8, 10)}${jcbDate.slice(0, 4)}.html`
+  : 'https://www.jcb.jp/';
 const copyrightYear = new Date().getFullYear();
 ---
 
@@ -20,11 +51,30 @@ const copyrightYear = new Date().getFullYear();
     <meta name="theme-color" content="#111720" />
     <link rel="icon" type="image/png" sizes="96x96" href="/favicon.png" />
     <link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg" />
-    <link rel="canonical" href="https://fx.purr.tw/" />
-    <title>FX Pulse — 外幣刷卡試算</title>
+    <link rel="canonical" href={canonical} />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="zh_TW" />
+    <meta property="og:site_name" content="FX Pulse 匯率脈動" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={shareImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:type" content="image/png" />
     <meta
-      name="description"
-      content="比較 VISA、Mastercard 和 JCB 的歷史匯率，試算外幣消費的台幣換算金額。"
+      property="og:image:alt"
+      content="FX Pulse：貓掌在日圓、美元與台幣主題的卡片間挑選，旁邊有熟睡的三花貓。刷卡前，比一下。"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={shareImage} />
+    <meta
+      name="twitter:image:alt"
+      content="FX Pulse：貓掌選卡與熟睡的三花貓。刷卡前，比一下。"
     />
   </head>
   <body>
@@ -75,7 +125,31 @@ const copyrightYear = new Date().getFullYear();
     </header>
 
     <main class="shell">
-      <h1 class="sr-only">外幣刷卡匯率比較</h1>
+      <div class="page-intro">
+        <h1>{heading}</h1>
+        <p>比較 VISA、Mastercard 與 JCB 參考匯率，試算外幣消費的台幣金額。</p>
+        <nav aria-label="刷卡匯率頁面">
+          <a href="/" aria-current={!currencyPage ? 'page' : undefined}>
+            全部幣別
+          </a>
+          <a
+            href="/jpy/"
+            aria-current={
+              currencyPage && defaultCurrency === 'JPY' ? 'page' : undefined
+            }
+          >
+            日圓刷卡匯率
+          </a>
+          <a
+            href="/usd/"
+            aria-current={
+              currencyPage && defaultCurrency === 'USD' ? 'page' : undefined
+            }
+          >
+            美元刷卡匯率
+          </a>
+        </nav>
+      </div>
 
       <div class="route-board">
         <div class="field currency-field">
@@ -83,15 +157,20 @@ const copyrightYear = new Date().getFullYear();
             消費幣別
           </span>
           <strong id="route-code" class="route-code">
-            JPY
+            {defaultCurrency}
           </strong>
           <span class="route-name">
             <span id="route-flag" class="route-flag" aria-hidden="true">
-              🇯🇵
+              {currencyInfo.flag}
             </span>
-            <span id="route-name">日圓</span>
+            <span id="route-name">{currencyInfo.name}</span>
           </span>
-          <input id="currency" name="currency" type="hidden" value="JPY" />
+          <input
+            id="currency"
+            name="currency"
+            type="hidden"
+            value={defaultCurrency}
+          />
         </div>
         <button
           type="button"
@@ -120,7 +199,7 @@ const copyrightYear = new Date().getFullYear();
             <button
               type="button"
               data-quick-currency={code}
-              aria-pressed={code === 'JPY'}
+              aria-pressed={code === defaultCurrency}
               aria-label={`${currencies[code]?.name ?? code} ${code}`}
             >
               <span class="currency-flag" aria-hidden="true">
@@ -150,7 +229,7 @@ const copyrightYear = new Date().getFullYear();
               消費金額
             </label>
             <div class="amount-wrap">
-              <span id="amount-code">JPY</span>
+              <span id="amount-code">{defaultCurrency}</span>
               <input
                 id="amount"
                 name="amount"
@@ -255,7 +334,7 @@ const copyrightYear = new Date().getFullYear();
         <div class="section-heading comparison-heading">
           <h2 id="comparison-title">換算結果</h2>
           <span class="comparison-context" id="comparison-context">
-            JPY → TWD
+            {defaultCurrency} → TWD
           </span>
         </div>
         <div class="comparison-panel">
@@ -266,42 +345,42 @@ const copyrightYear = new Date().getFullYear();
             <span id="difference-heading">與最低值的差額</span>
           </div>
           <div id="results" class="results" aria-live="polite">
-            {resultRows(ratesData.rates, 'JPY', latestDate, 10000).map(
-              (row) => (
-                <div class:list={['result-row', { 'is-best': row.best }]}>
-                  <div class="result-headline">
-                    <div class="result-source">
-                      <span class="source-icon" aria-hidden="true">
-                        <img
-                          src={`/icons/${row.src.toLowerCase()}.svg`}
-                          alt=""
-                        />
-                      </span>
-                      <strong>{row.src}</strong>
-                      {row.src === 'JCB' && (
-                        <span class="source-estimate">交叉匯率估算</span>
-                      )}
-                    </div>
-                    <div class="result-total">
-                      <strong>{row.totalText}</strong>
-                    </div>
+            {resultRows(
+              ratesData.rates,
+              defaultCurrency,
+              latestDate,
+              10000,
+            ).map((row) => (
+              <div class:list={['result-row', { 'is-best': row.best }]}>
+                <div class="result-headline">
+                  <div class="result-source">
+                    <span class="source-icon" aria-hidden="true">
+                      <img src={`/icons/${row.src.toLowerCase()}.svg`} alt="" />
+                    </span>
+                    <strong>{row.src}</strong>
+                    {row.src === 'JCB' && (
+                      <span class="source-estimate">交叉匯率估算</span>
+                    )}
                   </div>
-                  <div class="result-details">
-                    <div class="result-rate">
-                      <span>{row.rateText}</span>
-                    </div>
-                    <div
-                      class:list={[
-                        'result-difference',
-                        { 'best-badge': row.best },
-                      ]}
-                    >
-                      {row.differenceText}
-                    </div>
+                  <div class="result-total">
+                    <strong>{row.totalText}</strong>
                   </div>
                 </div>
-              ),
-            )}
+                <div class="result-details">
+                  <div class="result-rate">
+                    <span>{row.rateText}</span>
+                  </div>
+                  <div
+                    class:list={[
+                      'result-difference',
+                      { 'best-badge': row.best },
+                    ]}
+                  >
+                    {row.differenceText}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
           <script is:inline>
             {
@@ -358,7 +437,7 @@ const copyrightYear = new Date().getFullYear();
         <div class="history-panel">
           <div class="history-toolbar">
             <h2 id="history-title">
-              匯率走勢 <span id="chart-title">JPY / TWD</span>
+              匯率走勢 <span id="chart-title">{defaultCurrency} / TWD</span>
             </h2>
             <div class="segmented" role="group" aria-label="走勢期間">
               <button type="button" data-range="7" aria-pressed="true">
@@ -486,6 +565,100 @@ const copyrightYear = new Date().getFullYear();
             </div>
           </details>
         </div>
+      </section>
+      <section class="rate-guide" aria-labelledby="guide-title">
+        <h2 id="guide-title">
+          {currencyPage
+            ? `${currencyInfo.name}刷卡匯率怎麼看？`
+            : '外幣刷卡試算怎麼用？'}
+        </h2>
+        <p>
+          {currencyPage
+            ? `${currencyInfo.name}（${defaultCurrency}）頁預設將 10,000 ${defaultCurrency} 換算為台幣；你也可以修改金額、日期或切換換算方向。`
+            : '選擇消費幣別、金額與日期，即可比較三家卡組織的台幣換算金額；也能切換方向，以台幣預算估算可換得的外幣。'}
+        </p>
+        <p>
+          資料更新：{fetchedAt}（台灣時間）。最新可查詢匯率日期：
+          <time datetime={latestDate}>{latestDate}</time>
+          。更新時間不代表每家來源都有當日資料；缺資料時不補成零。
+        </p>
+        <details>
+          <summary>卡組織匯率、手續費與帳單的差別</summary>
+          <p>
+            本工具比較卡組織參考匯率，未計發卡銀行的海外交易手續費與信用卡回饋。實際帳單依銀行及卡組織適用的處理日期與規則計算，可能與消費日試算不同。
+          </p>
+          <p>
+            JCB
+            以公布的美元基準資料推算外幣兌台幣交叉匯率，屬估算值，不能視為保證入帳匯率。刷卡時也應留意商店是否提供動態貨幣轉換（DCC），其匯率可能不適用本工具。
+          </p>
+          <p>
+            官方資料：
+            <a href="https://www.visa.com.tw/support/consumer/travel-support/exchange-rate-calculator.html">
+              VISA 匯率計算器
+            </a>
+            、
+            <a href="https://www.mastercard.com/global/en/personal/get-support/currency-exchange-rate-converter.html">
+              Mastercard 匯率計算器
+            </a>
+            、<a href={jcbSource}>JCB 美元基準資料</a>。
+          </p>
+        </details>
+        {currencyPage && (
+          <div
+            class="rate-history"
+            role="region"
+            aria-label={`${currencyInfo.name}歷史匯率表`}
+            tabindex="0"
+          >
+            <table>
+              <caption>
+                {currencyInfo.name}近 7 個可查詢日期的參考匯率（1{' '}
+                {defaultCurrency} 兌 TWD）
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">日期</th>
+                  <th scope="col">VISA</th>
+                  <th scope="col">Mastercard</th>
+                  <th scope="col">JCB（估算）</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dates
+                  .slice(-7)
+                  .reverse()
+                  .map((date) => {
+                    const entries = rateEntries(
+                      ratesData.rates,
+                      defaultCurrency,
+                      date,
+                    );
+                    return (
+                      <tr>
+                        <th scope="row">
+                          <time datetime={date}>{date}</time>
+                        </th>
+                        {['VISA', 'Mastercard', 'JCB'].map((source) => {
+                          const rate = entries.find(
+                            (entry) => entry.src === source,
+                          )?.rate;
+                          return (
+                            <td>
+                              {rate === undefined ? '無資料' : rate.toFixed(6)}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+            <p>
+              此表固定顯示 {currencyInfo.name}
+              最新歷史資料，不隨上方試算選項變動；完整走勢可使用上方圖表查看。
+            </p>
+          </div>
+        )}
       </section>
     </main>
     <footer class="site-footer">
