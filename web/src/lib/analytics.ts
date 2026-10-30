@@ -1,12 +1,14 @@
 declare global {
+  const __GA_MEASUREMENT_ID__: string;
+
   interface Window {
     dataLayer?: unknown[];
     gtag?: (...args: unknown[]) => void;
   }
 }
 
-if (location.hostname === 'fx.purr.tw') {
-  const measurementId = 'G-4CXCX1QQP7';
+const measurementId = __GA_MEASUREMENT_ID__;
+if (location.origin === new URL(import.meta.env.SITE).origin) {
   const page = new URL(location.origin + location.pathname);
   const campaignKeys = [
     'utm_source',

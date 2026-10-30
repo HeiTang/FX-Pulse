@@ -1,4 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
+import astroConfig, { gaMeasurementId } from '../../astro.config.mjs';
+
+const site = new URL('/', astroConfig.site).origin;
 
 const commands = (page: Page) =>
   page.evaluate(() =>
@@ -9,7 +12,7 @@ const calculations = async (page: Page) =>
 
 test.beforeEach(async ({ page, baseURL }) => {
   // Serve the production hostname locally; never send test traffic to Google.
-  await page.route('https://fx.purr.tw/**', async (route) => {
+  await page.route(`${site}/**`, async (route) => {
     const url = new URL(route.request().url());
     const response = await route.fetch({
       url: `${baseURL}${url.pathname}${url.search}`,
@@ -29,16 +32,16 @@ test('landing pages record one view and strip trial amounts and unknown query va
 }) => {
   for (const path of ['/', '/jpy/', '/usd/']) {
     await page.goto(
-      `https://fx.purr.tw${path}?currency=USD&amount=12345&extra=private&utm_source=threads&utm_medium=social#results`,
+      `${site}${path}?currency=USD&amount=12345&extra=private&utm_source=threads&utm_medium=social#results`,
     );
     await expect.poll(async () => (await commands(page)).length).toBe(3);
     const initial = await commands(page);
     expect(initial[1]).toEqual([
       'config',
-      'G-4CXCX1QQP7',
+      gaMeasurementId,
       expect.objectContaining({
         send_page_view: false,
-        page_location: `https://fx.purr.tw${path}?utm_source=threads&utm_medium=social`,
+        page_location: `${site}${path}?utm_source=threads&utm_medium=social`,
         allow_google_signals: false,
         allow_ad_personalization_signals: false,
       }),
@@ -58,7 +61,7 @@ test('landing pages record one view and strip trial amounts and unknown query va
 test('valid calculations debounce, deduplicate and omit amounts', async ({
   page,
 }) => {
-  await page.goto('https://fx.purr.tw/usd/');
+  await page.goto(`${site}/usd/`);
   await expect.poll(async () => (await commands(page)).length).toBe(3);
   expect(await calculations(page)).toEqual([]);
   await page.locator('#amount').fill('100');
