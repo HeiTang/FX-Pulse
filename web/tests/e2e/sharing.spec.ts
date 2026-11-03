@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import ratesData from '../../src/data/rates.json' with { type: 'json' };
 import { availableDates } from '../../src/lib/rates';
+import { resultRows } from '../../src/lib/results';
 
 const dates = availableDates(ratesData.rates);
 const latest = dates.at(-1)!;
@@ -82,7 +83,15 @@ for (const direction of ['foreign-to-twd', 'twd-to-foreign']) {
     const jcb = page.locator('.result-row').filter({
       has: page.locator('.result-source strong', { hasText: 'JCB' }),
     });
-    await expect(jcb.locator('.result-total')).toContainText('約 ');
+    await expect(jcb.locator('.result-total')).toHaveText(
+      resultRows(
+        ratesData.rates,
+        'JPY',
+        latest,
+        12345,
+        direction === 'twd-to-foreign',
+      ).find((row) => row.src === 'JCB')!.totalText,
+    );
     await expect(jcb.locator('.source-estimate')).toHaveText('交叉匯率估算');
     await expect(jcb.locator('.source-estimate')).toBeVisible();
     expect(
