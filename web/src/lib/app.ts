@@ -242,8 +242,8 @@ function renderCurrencyShortcuts() {
     button.querySelector<HTMLElement>('[data-shortcut-rate]')!.textContent =
       rateText;
     button.setAttribute(
-      'aria-label',
-      `${currencies[code]?.name ?? code} ${code}，每 1 ${reverse ? 'TWD' : code} 可換得 ${reverse ? code : 'TWD'} ${rateText}，${best ? `${best.src}${best.src === 'JCB' ? '（估算）' : ''}` : '此日期無資料'}`,
+      'aria-description',
+      `每 1 ${reverse ? 'TWD' : code} 可換得 ${reverse ? code : 'TWD'} ${rateText}，${best ? `${best.src}${best.src === 'JCB' ? '（估算）' : ''}` : '此日期無資料'}`,
     );
   }
 }

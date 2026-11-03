@@ -183,7 +183,6 @@ const copyrightYear = new Date().getFullYear();
               href={pageForCurrency(code).path}
               data-quick-currency={code}
               aria-current={code === defaultCurrency ? 'page' : undefined}
-              aria-label={`${currencies[code]?.name ?? code} ${code}`}
             >
               <span class="currency-flag" aria-hidden="true">
                 {currencies[code]?.flag ?? '🌐'}
