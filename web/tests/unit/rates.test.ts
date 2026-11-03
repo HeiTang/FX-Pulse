@@ -5,6 +5,7 @@ import {
   availableDates,
   fractionDigits,
   historyDates,
+  historyRanges,
   periodComparison,
   rateEntries,
   sources,
@@ -14,6 +15,60 @@ import {
   formatFetchedAt,
   type RateDays,
 } from '../../src/lib/rates';
+
+test('history ranges use valid points within the table dates and keep each source latest date', () => {
+  const entry = (rate: number) => ({ rate, reverse: 1 });
+  const days: RateDays = {
+    '2026-01-01': { VISA: { JPY: entry(1) }, JCB: { JPY: entry(3) } },
+    '2026-01-02': { VISA: { JPY: entry(3) }, JCB: { JPY: entry(3) } },
+    '2026-01-03': {
+      VISA: { JPY: entry(2) },
+      JCB: { JPY: entry(0) },
+      Mastercard: { JPY: entry(NaN) },
+    },
+    '2026-01-04': { VISA: { JPY: entry(99) } },
+  };
+  const [visa, mastercard, jcb] = historyRanges(
+    days,
+    ['2026-01-03', '2026-01-01', 'invalid', '2026-01-02', '2026-01-01'],
+    'JPY',
+  );
+  assert.deepEqual(visa, {
+    src: 'VISA',
+    count: 3,
+    latest: { date: '2026-01-03', rate: 2 },
+    lowest: 1,
+    highest: 3,
+    position: 50,
+  });
+  assert.deepEqual(mastercard, {
+    src: 'Mastercard',
+    count: 0,
+    latest: null,
+    lowest: null,
+    highest: null,
+    position: null,
+  });
+  assert.deepEqual(jcb, {
+    src: 'JCB',
+    count: 2,
+    latest: { date: '2026-01-02', rate: 3 },
+    lowest: 3,
+    highest: 3,
+    position: 50,
+  });
+  assert.equal(historyRanges(days, ['2026-01-01'], 'JPY')[0].position, 50);
+  assert.ok(historyRanges(days, [], 'JPY').every((range) => range.count === 0));
+  assert.ok(
+    historyRanges(days, ['2026-01-01'], 'USD').every(
+      (range) => range.latest === null,
+    ),
+  );
+  assert.equal(
+    historyRanges(days, ['2026-01-01', '2026-01-02'], 'JPY')[0].position,
+    100,
+  );
+});
 
 test('three-source comparison requires valid same-day same-currency rates and counts ties once', () => {
   const entry = (rate: number) => ({ rate, reverse: 99 });
@@ -139,10 +194,8 @@ test('missing and invalid rates do not become comparison candidates or dates', (
   assert.deepEqual(rateEntries(days, 'JPY', '2026-01-02'), []);
   assert.deepEqual(availableDates({}), []);
   assert.equal(formatFetchedAt(''), '未提供');
-  assert.equal(
-    formatFetchedAt('2026-01-01T00:00:00Z'),
-    '2026年1月1日 上午8:00',
-  );
+  assert.equal(formatFetchedAt('2026-01-01T00:00:00Z'), '2026-01-01 08:00');
+  assert.equal(formatFetchedAt('2026-12-31T16:05:00Z'), '2027-01-01 00:05');
 });
 
 test('checked-in dataset has valid dates, supported currencies and finite positive rates', () => {
