@@ -1,6 +1,11 @@
 ---
-import { resultRows } from '../lib/results';
+import { formatMoney, resultRows } from '../lib/results';
 import InfoIcon from '../components/InfoIcon.astro';
+import HistoryData from '../components/HistoryData.astro';
+import {
+  currencyPage as pageForCurrency,
+  jcbSourceUrl,
+} from '../lib/currency-page';
 import '../styles/global.css';
 import ratesData from '../data/rates.json';
 import {
@@ -8,20 +13,21 @@ import {
   availableDates,
   formatFetchedAt,
   rateEntries,
+  historyDates,
+  periodComparison,
 } from '../lib/rates';
 
 interface Props {
-  defaultCurrency?: 'JPY' | 'USD';
+  defaultCurrency?: string;
   currencyPage?: boolean;
 }
 const { defaultCurrency = 'JPY', currencyPage = false } = Astro.props;
 const currencyInfo = currencies[defaultCurrency];
-const heading = currencyPage
-  ? `${currencyInfo.name}刷卡匯率比較與試算`
-  : '外幣刷卡匯率比較與試算';
+const pageInfo = pageForCurrency(defaultCurrency);
+const heading = currencyPage ? pageInfo.heading : '外幣刷卡匯率比較與試算';
 const title = `${heading}｜VISA、Mastercard、JCB — FX Pulse`;
 const description = currencyPage
-  ? `比較 ${currencyInfo.name}（${defaultCurrency}）兌台幣的 VISA、Mastercard 與 JCB 參考匯率，查看歷史資料並試算刷卡金額。JCB 為交叉匯率估算，未計銀行手續費與回饋。`
+  ? pageInfo.description
   : '比較 VISA、Mastercard 與 JCB 的外幣刷卡參考匯率，支援日圓、美元等 8 種幣別，查看歷史走勢並試算台幣金額。JCB 為交叉匯率估算，未計銀行手續費與回饋。';
 const canonical = new URL(
   currencyPage ? `/${defaultCurrency.toLowerCase()}/` : '/',
@@ -31,15 +37,15 @@ const shareImage = new URL('/og/fx-pulse.png', Astro.site).href;
 const dates = availableDates(ratesData.rates);
 const earliestDate = dates.at(0) ?? '';
 const latestDate = dates.at(-1) ?? '';
-const fetchedAt = formatFetchedAt(ratesData.meta.last_updated);
-const jcbDate = dates.findLast((date) =>
-  rateEntries(ratesData.rates, defaultCurrency, date).some(
-    (entry) => entry.src === 'JCB',
-  ),
+const initialComparison = periodComparison(
+  ratesData.rates,
+  historyDates(dates, latestDate, '7'),
+  defaultCurrency,
 );
-const jcbSource = jcbDate
-  ? `https://www.jcb.jp/rate/usd${jcbDate.slice(5, 7)}${jcbDate.slice(8, 10)}${jcbDate.slice(0, 4)}.html`
-  : 'https://www.jcb.jp/';
+const differenceText = (value: number | null) =>
+  value === null ? '—' : `約 NT$ ${formatMoney(value, 'TWD')}`;
+const fetchedAt = formatFetchedAt(ratesData.meta.last_updated);
+const jcbSource = jcbSourceUrl(ratesData.rates, dates, defaultCurrency);
 const copyrightYear = new Date().getFullYear();
 ---
 
@@ -101,10 +107,13 @@ const copyrightYear = new Date().getFullYear();
               stroke-linecap="round"
             />
           </svg>
-          <span>
-            FX Pulse <small>匯率脈動</small>
-          </span>
+          <span>FX Pulse</span>
         </a>
+        <h1 id="page-heading">{heading}</h1>
+        <span class="header-updated">
+          最後更新{' '}
+          <time datetime={ratesData.meta.last_updated}>{fetchedAt}</time>
+        </span>
         <a
           class="github-link"
           href="https://github.com/HeiTang/FX-Pulse"
@@ -125,32 +134,6 @@ const copyrightYear = new Date().getFullYear();
     </header>
 
     <main class="shell">
-      <div class="page-intro">
-        <h1>{heading}</h1>
-        <p>比較 VISA、Mastercard 與 JCB 參考匯率，試算外幣消費的台幣金額。</p>
-        <nav aria-label="刷卡匯率頁面">
-          <a href="/" aria-current={!currencyPage ? 'page' : undefined}>
-            全部幣別
-          </a>
-          <a
-            href="/jpy/"
-            aria-current={
-              currencyPage && defaultCurrency === 'JPY' ? 'page' : undefined
-            }
-          >
-            日圓刷卡匯率
-          </a>
-          <a
-            href="/usd/"
-            aria-current={
-              currencyPage && defaultCurrency === 'USD' ? 'page' : undefined
-            }
-          >
-            美元刷卡匯率
-          </a>
-        </nav>
-      </div>
-
       <div class="route-board">
         <div class="field currency-field">
           <span class="route-label" id="foreign-label">
@@ -194,12 +177,12 @@ const copyrightYear = new Date().getFullYear();
         </div>
       </div>
       <section class="workspace" aria-label="外幣消費試算">
-        <div class="currency-shortcuts" role="group" aria-label="快速選擇幣別">
+        <nav class="currency-shortcuts" aria-label="快速選擇幣別">
           {ratesData.meta.currencies.map((code) => (
-            <button
-              type="button"
+            <a
+              href={pageForCurrency(code).path}
               data-quick-currency={code}
-              aria-pressed={code === defaultCurrency}
+              aria-current={code === defaultCurrency ? 'page' : undefined}
               aria-label={`${currencies[code]?.name ?? code} ${code}`}
             >
               <span class="currency-flag" aria-hidden="true">
@@ -212,11 +195,20 @@ const copyrightYear = new Date().getFullYear();
                 </span>
               </span>
               <span class="shortcut-rate" data-shortcut-rate>
-                —
+                {(() => {
+                  const best = rateEntries(
+                    ratesData.rates,
+                    code,
+                    latestDate,
+                  ).sort((a, b) => a.rate - b.rate)[0];
+                  return best
+                    ? `${best.src === 'JCB' ? '約 ' : ''}${new Intl.NumberFormat('zh-TW', { maximumSignificantDigits: 4 }).format(best.rate)}`
+                    : '—';
+                })()}
               </span>
-            </button>
+            </a>
           ))}
-        </div>
+        </nav>
         <p class="shortcut-hint" id="shortcut-hint">
           <InfoIcon />
           <span id="shortcut-hint-text">
@@ -433,241 +425,298 @@ const copyrightYear = new Date().getFullYear();
         </p>
       </section>
 
-      <section class="history" aria-labelledby="history-title">
-        <div class="history-panel">
-          <div class="history-toolbar">
-            <h2 id="history-title">
-              匯率走勢 <span id="chart-title">{defaultCurrency} / TWD</span>
-            </h2>
-            <div class="segmented" role="group" aria-label="走勢期間">
-              <button type="button" data-range="7" aria-pressed="true">
-                7 天
-              </button>
-              <button type="button" data-range="30" aria-pressed="false">
-                30 天
-              </button>
-              <button type="button" data-range="all" aria-pressed="false">
-                全部
-              </button>
-            </div>
-          </div>
-          <div class="source-filters" role="group" aria-label="走勢資料來源">
-            <button type="button" data-source="all" aria-pressed="true">
-              全部來源
-            </button>
-            <button type="button" data-source="VISA" aria-pressed="false">
-              <i class="legend-dot visa"></i> VISA
-            </button>
-            <button type="button" data-source="Mastercard" aria-pressed="false">
-              <i class="legend-dot mastercard"></i> Mastercard
-            </button>
-            <button type="button" data-source="JCB" aria-pressed="false">
-              <i class="legend-dot jcb"></i> JCB
-            </button>
-          </div>
-          <div id="chart" role="img" aria-label="歷史匯率走勢圖"></div>
-          <div id="chart-placeholder" class="chart-placeholder" hidden>
-            所選期間可用資料不足，無法繪製走勢。
-          </div>
-          <p class="chart-note" id="chart-note">
-            1 外幣 = TWD · 截至所選日期 · 線段可能跨過缺資料日
-          </p>
-          <details class="period-comparison">
-            <summary>
-              <span class="period-summary-title">期間統計</span>
-              <span id="period-sources-hint" class="period-summary-hint">
-                卡組織匯率比較
-              </span>
-              <svg
-                class="period-chevron"
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                aria-hidden="true"
-              >
-                <path d="m6 9 6 6 6-6"></path>
-              </svg>
-            </summary>
-            <div class="period-content">
-              <div class="period-heading">
-                <p id="period-context" class="period-context"></p>
-                <p id="period-dates" class="period-muted"></p>
-              </div>
-              <div class="period-grid">
-                <div class="period-days">
-                  <dl class="period-stats">
-                    <div class="period-count-row">
-                      <dt>同日可比較</dt>
-                      <dd id="period-count"></dd>
-                    </div>
-                    <div>
-                      <dt>
-                        <i class="legend-dot visa" aria-hidden="true"></i>
-                        <span id="period-visa-label">VISA 最低</span>
-                      </dt>
-                      <dd id="period-visa"></dd>
-                    </div>
-                    <div>
-                      <dt>
-                        <i class="legend-dot mastercard" aria-hidden="true"></i>
-                        <span id="period-mastercard-label">
-                          Mastercard 最低
-                        </span>
-                      </dt>
-                      <dd id="period-mastercard"></dd>
-                    </div>
-                    <div>
-                      <dt>
-                        <i class="legend-dot jcb" aria-hidden="true"></i>
-                        <span id="period-jcb-label">JCB 最低（估算）</span>
-                      </dt>
-                      <dd id="period-jcb"></dd>
-                    </div>
-                    <div class="period-muted">
-                      <dt id="period-tied-label">最低並列</dt>
-                      <dd id="period-tied"></dd>
-                    </div>
-                  </dl>
-                </div>
-                <div class="period-money">
-                  <p id="period-amount" class="period-muted"></p>
-                  <dl class="period-stats">
-                    <div class="period-median-row">
-                      <dt>每日最高與最低差額中位數</dt>
-                      <dd id="period-median"></dd>
-                    </div>
-                    <div class="period-maximum-row">
-                      <dt>最大差額</dt>
-                      <dd id="period-maximum"></dd>
-                    </div>
-                  </dl>
-                </div>
-              </div>
-              <p id="period-message" class="period-message" role="status"></p>
-              <div class="period-footnote">
-                <p>
-                  <InfoIcon />
-                  <span>
-                    只比較同日、同幣別且三家都有資料的日期；JCB
-                    為估算，並列另計。
-                  </span>
-                </p>
-                <p>
-                  <InfoIcon />
-                  <span>
-                    差額＝每日最高－最低，含並列日；同步試算金額與方向，未計手續費與回饋。
-                  </span>
-                </p>
-              </div>
-            </div>
-          </details>
-        </div>
-      </section>
-      <section class="rate-guide" aria-labelledby="guide-title">
-        <h2 id="guide-title">
-          {currencyPage
-            ? `${currencyInfo.name}刷卡匯率怎麼看？`
-            : '外幣刷卡試算怎麼用？'}
-        </h2>
-        <p>
-          {currencyPage
-            ? `${currencyInfo.name}（${defaultCurrency}）頁預設將 10,000 ${defaultCurrency} 換算為台幣；你也可以修改金額、日期或切換換算方向。`
-            : '選擇消費幣別、金額與日期，即可比較三家卡組織的台幣換算金額；也能切換方向，以台幣預算估算可換得的外幣。'}
-        </p>
-        <p>
-          資料更新：{fetchedAt}（台灣時間）。最新可查詢匯率日期：
-          <time datetime={latestDate}>{latestDate}</time>
-          。更新時間不代表每家來源都有當日資料；缺資料時不補成零。
-        </p>
-        <details>
-          <summary>卡組織匯率、手續費與帳單的差別</summary>
-          <p>
-            本工具比較卡組織參考匯率，未計發卡銀行的海外交易手續費與信用卡回饋。實際帳單依銀行及卡組織適用的處理日期與規則計算，可能與消費日試算不同。
-          </p>
-          <p>
-            JCB
-            以公布的美元基準資料推算外幣兌台幣交叉匯率，屬估算值，不能視為保證入帳匯率。刷卡時也應留意商店是否提供動態貨幣轉換（DCC），其匯率可能不適用本工具。
-          </p>
-          <p>
-            官方資料：
-            <a href="https://www.visa.com.tw/support/consumer/travel-support/exchange-rate-calculator.html">
-              VISA 匯率計算器
-            </a>
-            、
-            <a href="https://www.mastercard.com/global/en/personal/get-support/currency-exchange-rate-converter.html">
-              Mastercard 匯率計算器
-            </a>
-            、<a href={jcbSource}>JCB 美元基準資料</a>。
-          </p>
-        </details>
-        {currencyPage && (
-          <div
-            class="rate-history"
-            role="region"
-            aria-label={`${currencyInfo.name}歷史匯率表`}
-            tabindex="0"
+      <div class="rate-guide rate-views" id="rate-info">
+        <nav class="view-tabs" aria-label="匯率資料檢視">
+          <a
+            href="#view-chart"
+            id="tab-chart"
+            aria-controls="view-chart"
+            data-view="chart"
           >
-            <table>
-              <caption>
-                {currencyInfo.name}近 7 個可查詢日期的參考匯率（1{' '}
-                {defaultCurrency} 兌 TWD）
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col">日期</th>
-                  <th scope="col">VISA</th>
-                  <th scope="col">Mastercard</th>
-                  <th scope="col">JCB（估算）</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dates
-                  .slice(-7)
-                  .reverse()
-                  .map((date) => {
-                    const entries = rateEntries(
-                      ratesData.rates,
-                      defaultCurrency,
-                      date,
-                    );
-                    return (
-                      <tr>
-                        <th scope="row">
-                          <time datetime={date}>{date}</time>
-                        </th>
-                        {['VISA', 'Mastercard', 'JCB'].map((source) => {
-                          const rate = entries.find(
-                            (entry) => entry.src === source,
-                          )?.rate;
-                          return (
-                            <td>
-                              {rate === undefined ? '無資料' : rate.toFixed(6)}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-            <p>
-              此表固定顯示 {currencyInfo.name}
-              最新歷史資料，不隨上方試算選項變動；完整走勢可使用上方圖表查看。
+            匯率走勢
+          </a>
+          <a
+            href="#view-history"
+            id="tab-history"
+            aria-controls="view-history"
+            data-view="history"
+          >
+            歷史匯率
+          </a>
+          <a
+            href="#view-method"
+            id="tab-method"
+            aria-controls="view-method"
+            data-view="method"
+          >
+            計算與資料說明
+          </a>
+        </nav>
+        <section
+          class="history"
+          id="view-chart"
+          data-view-panel
+          aria-labelledby="history-title"
+        >
+          <div class="history-panel">
+            <div class="history-toolbar">
+              <h2 id="history-title">
+                匯率走勢 <span id="chart-title">{defaultCurrency} / TWD</span>
+              </h2>
+              <div class="segmented" role="group" aria-label="走勢期間">
+                <button type="button" data-range="7" aria-pressed="true">
+                  7 天
+                </button>
+                <button type="button" data-range="30" aria-pressed="false">
+                  30 天
+                </button>
+                <button type="button" data-range="all" aria-pressed="false">
+                  全部
+                </button>
+              </div>
+            </div>
+            <div class="source-filters" role="group" aria-label="走勢資料來源">
+              <button type="button" data-source="all" aria-pressed="true">
+                全部來源
+              </button>
+              <button type="button" data-source="VISA" aria-pressed="false">
+                <i class="legend-dot visa"></i> VISA
+              </button>
+              <button
+                type="button"
+                data-source="Mastercard"
+                aria-pressed="false"
+              >
+                <i class="legend-dot mastercard"></i> Mastercard
+              </button>
+              <button type="button" data-source="JCB" aria-pressed="false">
+                <i class="legend-dot jcb"></i> JCB
+              </button>
+            </div>
+            <div id="chart" role="img" aria-label="歷史匯率走勢圖"></div>
+            <div id="chart-placeholder" class="chart-placeholder" hidden>
+              所選期間可用資料不足，無法繪製走勢。
+            </div>
+            <p class="chart-note" id="chart-note">
+              1 外幣 = TWD · 截至所選日期 · 線段可能跨過缺資料日
+            </p>
+            <details class="period-comparison" id="period-comparison">
+              <summary>
+                <span class="period-summary-title">期間統計</span>
+                <span id="period-sources-hint" class="period-summary-hint">
+                  卡組織匯率比較
+                </span>
+                <svg
+                  class="period-chevron"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  aria-hidden="true"
+                >
+                  <path d="m6 9 6 6 6-6"></path>
+                </svg>
+              </summary>
+              <div class="period-content">
+                <div class="period-heading">
+                  <p id="period-context" class="period-context">
+                    近 7 天 · {defaultCurrency} · 三家比較
+                  </p>
+                  <p id="period-dates" class="period-muted">
+                    截至 {latestDate}
+                  </p>
+                </div>
+                <div class="period-grid">
+                  <div class="period-days">
+                    <dl class="period-stats">
+                      <div class="period-count-row">
+                        <dt>同日可比較</dt>
+                        <dd id="period-count">{initialComparison.count} 天</dd>
+                      </div>
+                      <div>
+                        <dt>
+                          <i class="legend-dot visa" aria-hidden="true"></i>
+                          <span id="period-visa-label">VISA 最低</span>
+                        </dt>
+                        <dd id="period-visa">
+                          {initialComparison.bestDays.VISA} 天
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>
+                          <i
+                            class="legend-dot mastercard"
+                            aria-hidden="true"
+                          ></i>
+                          <span id="period-mastercard-label">
+                            Mastercard 最低
+                          </span>
+                        </dt>
+                        <dd id="period-mastercard">
+                          {initialComparison.bestDays.Mastercard} 天
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>
+                          <i class="legend-dot jcb" aria-hidden="true"></i>
+                          <span id="period-jcb-label">JCB 最低（估算）</span>
+                        </dt>
+                        <dd id="period-jcb">
+                          {initialComparison.bestDays.JCB} 天
+                        </dd>
+                      </div>
+                      <div class="period-muted">
+                        <dt id="period-tied-label">最低並列</dt>
+                        <dd id="period-tied">{initialComparison.tied} 天</dd>
+                      </div>
+                    </dl>
+                  </div>
+                  <div class="period-money">
+                    <p id="period-amount" class="period-muted">
+                      換算 {formatMoney(10_000, defaultCurrency)}{' '}
+                      {defaultCurrency} → TWD
+                    </p>
+                    <dl class="period-stats">
+                      <div class="period-median-row">
+                        <dt>差額中位數</dt>
+                        <dd id="period-median">
+                          {differenceText(initialComparison.median)}
+                        </dd>
+                      </div>
+                      <div class="period-maximum-row">
+                        <dt>最大差額</dt>
+                        <dd id="period-maximum">
+                          {differenceText(initialComparison.maximum)}
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+                </div>
+                <p id="period-message" class="period-message" role="status">
+                  {initialComparison.count === 0
+                    ? '所選期間沒有同日、同幣別且三家都有有效匯率的資料。'
+                    : ''}
+                </p>
+                <div class="period-footnote">
+                  <p>
+                    <InfoIcon />
+                    <span>
+                      僅計同日、同幣別三家資料齊全日；最低並列另計，JCB 為估算。
+                    </span>
+                  </p>
+                  <p>
+                    <InfoIcon />
+                    <span>
+                      差額＝每日最高－最低，含並列日；未計銀行手續費與回饋。
+                    </span>
+                  </p>
+                </div>
+              </div>
+            </details>
+          </div>
+        </section>
+        <HistoryData code={defaultCurrency} />
+        {ratesData.meta.currencies.map((code) => (
+          <template data-history-currency={code}>
+            <HistoryData code={code} />
+          </template>
+        ))}
+        <section
+          class="guide-details"
+          id="view-method"
+          data-view-panel
+          aria-labelledby="method-title"
+        >
+          <h2 id="method-title">計算與資料說明</h2>
+          <div class="guide-detail-content">
+            <div class="guide-formulas">
+              <h3>換算方式</h3>
+              <div class="guide-formula">
+                <span>外幣 → 台幣</span>
+                <div>
+                  <b>外幣金額</b>
+                  <span>×</span>
+                  <b>匯率</b>
+                </div>
+              </div>
+              <div class="guide-formula">
+                <span>台幣 → 外幣</span>
+                <div>
+                  <b>台幣金額</b>
+                  <span>÷</span>
+                  <b>匯率</b>
+                </div>
+              </div>
+              <p class="guide-formula-note">
+                參考換算額，未含銀行手續費與回饋。
+              </p>
+            </div>
+            <div class="guide-sources">
+              <h3>官方資料</h3>
+              {[
+                {
+                  name: 'VISA',
+                  icon: 'visa',
+                  note: '匯率計算器',
+                  url: 'https://www.visa.com.tw/support/consumer/travel-support/exchange-rate-calculator.html',
+                },
+                {
+                  name: 'Mastercard',
+                  icon: 'mastercard',
+                  note: '匯率計算器',
+                  url: 'https://www.mastercard.com/global/en/personal/get-support/currency-exchange-rate-converter.html',
+                },
+                {
+                  name: 'JCB',
+                  icon: 'jcb',
+                  note: '美元基準 · 交叉匯率估算',
+                  url: jcbSource,
+                },
+              ].map((source) => (
+                <a
+                  class="guide-source"
+                  href={source.url}
+                  data-jcb-source-link={source.name === 'JCB' ? '' : undefined}
+                >
+                  <img
+                    src={`/icons/${source.icon}.svg`}
+                    width="24"
+                    height="24"
+                    alt=""
+                  />
+                  <span>
+                    <strong>{source.name}</strong>
+                    <small>{source.note}</small>
+                  </span>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.75"
+                    aria-hidden="true"
+                  >
+                    <path d="M7 17 17 7M7 7h10v10" />
+                  </svg>
+                </a>
+              ))}
+            </div>
+            <p class="guide-caveat">
+              帳單依實際處理日與銀行規則計算；商店 DCC 換匯不適用。
             </p>
           </div>
-        )}
-      </section>
+        </section>
+      </div>
     </main>
     <footer class="site-footer">
       <div class="shell footer-inner">
         <span>
-          資料來源：VISA / Mastercard / JCB · 非官方工具
-          <span class="footer-updated">更新時間：{fetchedAt}（台灣時間）</span>
+          © {copyrightYear} HeiTang<span class="footer-separator">・</span>
         </span>
-        <span>© {copyrightYear} HeiTang</span>
+        <span>資料來源：VISA / Mastercard / JCB</span>
       </div>
     </footer>
 

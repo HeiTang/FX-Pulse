@@ -1,0 +1,152 @@
+---
+import InfoIcon from './InfoIcon.astro';
+import ratesData from '../data/rates.json';
+import {
+  availableDates,
+  currencies,
+  historyRanges,
+  rateEntries,
+  colors,
+} from '../lib/rates';
+interface Props {
+  code: string;
+}
+const { code } = Astro.props;
+const currencyInfo = currencies[code];
+const recentDates = availableDates(ratesData.rates).slice(-7);
+const ranges = historyRanges(ratesData.rates, recentDates, code);
+---
+
+<section
+  id="view-history"
+  data-view-panel
+  class="history-view"
+  aria-labelledby="history-table-title"
+  aria-label={`${currencyInfo.name}歷史匯率表`}
+  tabindex="0"
+>
+  <div
+    class="rate-history"
+    role="region"
+    aria-label={`${currencyInfo.name}歷史匯率表`}
+    tabindex="0"
+  >
+    <table>
+      <caption>
+        <h2 class="history-title" id="history-table-title">
+          {currencyInfo.name}歷史匯率
+        </h2>
+        <span class="history-subtitle">
+          近 7 個可查詢日期 · 1 {code} 兌 TWD
+        </span>
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">日期</th>
+          <th scope="col">
+            <span class="history-source">
+              <i class="legend-dot visa" aria-hidden="true"></i>VISA
+            </span>
+          </th>
+          <th scope="col">
+            <span class="history-source">
+              <i class="legend-dot mastercard" aria-hidden="true"></i>
+              Mastercard
+            </span>
+          </th>
+          <th scope="col">
+            <span class="history-source">
+              <i class="legend-dot jcb" aria-hidden="true"></i>JCB
+            </span>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {recentDates
+          .slice()
+          .reverse()
+          .map((date) => {
+            const entries = rateEntries(ratesData.rates, code, date);
+            return (
+              <tr>
+                <th scope="row">
+                  <time datetime={date} aria-label={date}>
+                    <span class="history-year">{date.slice(0, 5)}</span>
+                    {date.slice(5)}
+                  </time>
+                </th>
+                {['VISA', 'Mastercard', 'JCB'].map((source) => {
+                  const rate = entries.find(
+                    (entry) => entry.src === source,
+                  )?.rate;
+                  return (
+                    <td>{rate === undefined ? '無資料' : rate.toFixed(6)}</td>
+                  );
+                })}
+              </tr>
+            );
+          })}
+      </tbody>
+    </table>
+    <p class="info-note">
+      <InfoIcon />
+      <span>JCB 為估算。表格不隨試算金額、日期與方向變動。</span>
+    </p>
+  </div>
+  <aside class="history-ranges" aria-labelledby="ranges-title">
+    <h3 id="ranges-title">區間摘要</h3>
+    {ranges.map((range) => (
+      <div
+        class="range-item"
+        style={`--source-color: ${colors[range.src]}; --position: ${range.position ?? 50}%`}
+      >
+        <div class="range-heading">
+          <strong>
+            <i class="range-dot" aria-hidden="true"></i>
+            {range.src}
+          </strong>
+          {range.count < recentDates.length && (
+            <span>
+              {range.count} / {recentDates.length} 筆
+            </span>
+          )}
+        </div>
+        {range.latest ? (
+          <>
+            <p class="range-latest">
+              <span>
+                <time
+                  datetime={range.latest.date}
+                  aria-label={`最新有效日期 ${range.latest.date}`}
+                >
+                  {range.latest.date.slice(5)}
+                </time>
+              </span>
+              <strong>{range.latest.rate.toFixed(6)}</strong>
+            </p>
+            <div class="range-track" aria-hidden="true">
+              <span></span>
+            </div>
+            <div class="range-bounds">
+              <span>最低 {range.lowest!.toFixed(6)}</span>
+              <span>最高 {range.highest!.toFixed(6)}</span>
+            </div>
+            {range.lowest === range.highest && (
+              <p class="range-empty">
+                {range.count === 1
+                  ? '僅 1 筆，無法呈現變動區間'
+                  : '期間匯率相同'}
+              </p>
+            )}
+          </>
+        ) : (
+          <p class="range-empty">此期間無有效資料</p>
+        )}
+      </div>
+    ))}
+    <p class="ranges-note info-note">
+      <InfoIcon />
+      <span>圓點表示最新匯率；左右兩端是該家近期最低與最高值。</span>
+    </p>
+  </aside>
+</section>
