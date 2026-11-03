@@ -110,3 +110,50 @@ test('localhost does not load Google Analytics or queue events', async ({
   expect(await commands(page)).toEqual([]);
   expect(loadedGoogleTag).toBe(false);
 });
+
+test('Google tag waits for idle while views and calculations stay queued', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.requestIdleCallback = (callback, options) => {
+      if (options?.timeout !== 1000) throw new Error('Missing idle timeout');
+      window.addEventListener(
+        'test:idle',
+        () => callback({ didTimeout: false, timeRemaining: () => 50 }),
+        { once: true },
+      );
+      return 1;
+    };
+  });
+  const requests: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes('googletagmanager.com'))
+      requests.push(request.url());
+  });
+  await page.goto(`${site}/jpy/`);
+  await expect.poll(async () => (await commands(page)).length).toBe(3);
+  expect(requests).toHaveLength(0);
+  await page.locator('#amount').fill('200');
+  await page.locator('#amount').press('Enter');
+  await expect.poll(async () => (await calculations(page)).length).toBe(1);
+  await page.evaluate(() => window.dispatchEvent(new Event('test:idle')));
+  await expect.poll(() => requests.length).toBe(1);
+  expect(
+    (await commands(page)).filter((entry) => entry[1] === 'page_view'),
+  ).toHaveLength(1);
+  expect(await calculations(page)).toHaveLength(1);
+});
+
+test('Google tag loads when requestIdleCallback is unavailable', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'requestIdleCallback', { value: undefined });
+  });
+  const tag = page.waitForRequest('https://www.googletagmanager.com/**');
+  await page.goto(`${site}/usd/`);
+  await tag;
+  expect(
+    (await commands(page)).filter((entry) => entry[1] === 'page_view'),
+  ).toHaveLength(1);
+});
