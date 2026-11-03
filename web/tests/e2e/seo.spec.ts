@@ -47,6 +47,15 @@ for (const [path, code, name] of [
         await expect(page.locator(`#${id}`)).toBeVisible();
       await expect(page.locator('#view-method .guide-source')).toHaveCount(3);
       await expect(page.locator('#view-method')).toContainText('外幣金額');
+      await expect(page.locator('.guide-jcb-formula')).toContainText(
+        '每美元兌台幣賣出價',
+      );
+      await expect(page.locator('.guide-jcb-formula')).toContainText(
+        '每美元兌外幣買入價',
+      );
+      await expect(page.locator('#view-method')).toContainText(
+        '使用同日 JCB 美元基準表；美元的分母為 1，缺資料日不沿用前值。',
+      );
       const ranges = historyRanges(
         ratesData.rates,
         availableDates(ratesData.rates).slice(-7),

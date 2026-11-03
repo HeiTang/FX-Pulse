@@ -1377,6 +1377,9 @@ main.shell {
 .guide-formula + .guide-formula {
   margin-top: 16px;
 }
+.guide-formula-note + .guide-formula {
+  margin-top: 24px;
+}
 .guide-formula > span {
   display: block;
   color: #a1aec1;
