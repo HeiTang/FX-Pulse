@@ -54,7 +54,7 @@ for (const [path, code, name] of [
         '外幣買價',
       );
       await expect(page.locator('#view-method')).toContainText(
-        '同日每美元報價；美元分母為 1，缺值不遞補。',
+        '同日每美元報價；USD 分母 1，缺值不補。',
       );
       const ranges = historyRanges(
         ratesData.rates,

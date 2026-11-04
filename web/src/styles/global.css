@@ -1362,84 +1362,97 @@ main.shell {
 }
 .guide-detail-content {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  row-gap: 16px;
-  padding: 16px 0 0;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  margin-top: 16px;
   width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #151e2b;
 }
 .guide-detail-content h3 {
-  color: #e1e8f2;
-  font-size: 16px;
-  font-weight: 650;
-  margin: 0 0 12px;
+  color: #a1aec1;
+  font-size: 13px;
+  font-weight: 500;
+  margin: 0;
 }
 .guide-formula {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-content: start;
-  gap: 8px;
+  gap: 12px;
+  padding: 20px 22px;
+}
+.guide-formula + .guide-formula {
+  border-left: 1px solid var(--line);
 }
 .guide-formulas {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24px;
-}
-.guide-formula > span {
-  display: block;
-  color: #a1aec1;
-  font-size: 13px;
+  grid-column: 1 / -1;
+  border-bottom: 1px solid var(--line);
 }
 .guide-formula > div {
   display: flex;
-  gap: 6px;
+  gap: 10px;
   align-items: center;
-  font-size: 16px;
 }
 .guide-formula b {
-  padding: 4px 6px;
-  border-radius: 5px;
-  background: #1b2431;
-  font-size: 16px;
-  font-weight: 500;
+  color: #edf2fa;
+  font-size: clamp(16px, 1.8vw, 20px);
+  font-weight: 650;
+  letter-spacing: -0.025em;
 }
 .guide-formula > div > span {
-  color: #a1aec1;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #25332d;
+  color: #c2eb74;
+  font-size: 18px;
 }
 .rate-guide .guide-formula-note {
   grid-column: 1 / -1;
   font-size: 13px;
   line-height: 1.6;
+  text-wrap: pretty;
 }
 .guide-sources {
   display: flex;
   align-items: center;
-  gap: 16px;
-}
-.guide-sources h3 {
-  margin: 0;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px 20px;
+  background: #111a25;
 }
 .guide-source-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 .rate-guide .guide-source {
   display: inline-flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
   min-height: 44px;
-  padding: 6px 8px;
-  background: #1b2431;
+  padding: 6px;
   border-radius: 8px;
-  color: #e1e8f2;
+  color: #c5d0df;
   text-decoration: none;
+}
+.rate-guide .guide-source:hover {
+  background: #253144;
+  color: #fff;
 }
 .guide-source img {
   width: 18px;
   height: 18px;
 }
 .guide-source strong {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
 }
 .guide-source:hover strong {
@@ -1448,25 +1461,50 @@ main.shell {
   text-underline-offset: 4px;
 }
 .rate-guide .guide-caveat {
-  grid-column: 1 / -1;
+  align-self: stretch;
+  align-content: center;
+  padding: 12px 20px 12px 0;
+  background: #111a25;
   font-size: 13px;
   line-height: 1.6;
 }
 @media (max-width: 767px) {
+  .guide-detail-content {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .guide-formulas {
     grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
   }
   .guide-formula {
     grid-template-columns: 80px minmax(0, 1fr);
     align-items: center;
+    padding: 10px 14px;
     column-gap: 12px;
+    row-gap: 8px;
+  }
+  .guide-formula + .guide-formula {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+  .guide-formula b {
+    font-size: 16px;
+  }
+  .guide-formula > div {
+    gap: 6px;
+  }
+  .guide-formula > div > span {
+    width: 24px;
+    height: 24px;
+    font-size: 16px;
   }
   .guide-sources {
-    display: block;
+    padding: 10px 14px 0;
   }
   .guide-sources h3 {
-    margin-bottom: 8px;
+    flex-basis: 100%;
+  }
+  .rate-guide .guide-caveat {
+    padding: 4px 14px 12px;
   }
 }
 .rate-history {
