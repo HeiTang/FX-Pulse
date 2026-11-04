@@ -1362,39 +1362,41 @@ main.shell {
 }
 .guide-detail-content {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  column-gap: 48px;
-  row-gap: 24px;
-  padding: 24px 0 12px;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  column-gap: 32px;
+  row-gap: 16px;
+  padding: 16px 0 0;
   width: 100%;
 }
 .guide-detail-content h3 {
   color: #e1e8f2;
   font-size: 16px;
   font-weight: 650;
-  margin: 0 0 20px;
+  margin: 0 0 12px;
+}
+.guide-formula {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
 }
 .guide-formula + .guide-formula {
-  margin-top: 16px;
-}
-.guide-formula-note + .guide-formula {
-  margin-top: 24px;
+  margin-top: 8px;
 }
 .guide-formula > span {
   display: block;
   color: #a1aec1;
-  font-size: 12px;
-  margin-bottom: 8px;
+  font-size: 13px;
 }
 .guide-formula > div {
   display: flex;
-  gap: 12px;
+  gap: 6px;
   align-items: center;
-  font-size: 20px;
+  font-size: 16px;
 }
 .guide-formula b {
-  padding: 10px 14px;
-  border-radius: 8px;
+  padding: 4px 6px;
+  border-radius: 5px;
   background: #1b2431;
   font-size: 16px;
   font-weight: 500;
@@ -1403,37 +1405,37 @@ main.shell {
   color: #a1aec1;
 }
 .rate-guide .guide-formula-note {
-  margin-top: 16px;
-  font-size: 12px;
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.6;
 }
 .guide-sources {
-  padding-left: 32px;
+  padding-left: 24px;
   border-left: 1px solid var(--line);
 }
-.rate-guide .guide-source {
+.guide-source-links {
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.rate-guide .guide-source {
+  display: inline-flex;
+  gap: 8px;
   align-items: center;
-  min-height: 56px;
-  padding-block: 8px;
+  min-height: 44px;
+  padding: 6px 8px;
+  background: #1b2431;
+  border-radius: 8px;
   color: #e1e8f2;
   text-decoration: none;
 }
-.guide-source > span {
-  flex: 1;
+.guide-source img {
+  width: 18px;
+  height: 18px;
 }
 .guide-source strong {
   font-size: 14px;
   font-weight: 500;
-}
-.guide-source small {
-  display: block;
-  color: #a1aec1;
-  font-size: 12px;
-  margin-top: 3px;
-}
-.guide-source > svg {
-  color: #a1aec1;
 }
 .guide-source:hover strong {
   color: #a9c5ff;
@@ -1442,11 +1444,10 @@ main.shell {
 }
 .rate-guide .guide-caveat {
   grid-column: 1 / -1;
-  padding-left: 12px;
-  border-left: 2px solid var(--line);
-  font-size: 12px;
+  font-size: 13px;
+  line-height: 1.6;
 }
-@media (max-width: 600px) {
+@media (max-width: 900px) {
   .guide-detail-content {
     grid-template-columns: minmax(0, 1fr);
   }

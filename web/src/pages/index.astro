@@ -648,74 +648,58 @@ const copyrightYear = new Date().getFullYear();
                   <b>匯率</b>
                 </div>
               </div>
-              <p class="guide-formula-note">
-                參考換算額，未含銀行手續費與回饋。
-              </p>
               <div class="guide-formula guide-jcb-formula">
-                <span>JCB 交叉估算 · 1 外幣兌台幣</span>
+                <span>JCB 估算</span>
                 <div>
-                  <b>每美元兌台幣賣出價</b>
+                  <b>台幣賣價</b>
                   <span>÷</span>
-                  <b>每美元兌外幣買入價</b>
+                  <b>外幣買價</b>
                 </div>
               </div>
               <p class="guide-formula-note">
-                使用同日 JCB 美元基準表；美元的分母為 1，缺資料日不沿用前值。
+                買賣價皆為同日每美元報價；美元分母為 1，缺值不遞補。
               </p>
             </div>
             <div class="guide-sources">
-              <h3>官方資料</h3>
-              {[
-                {
-                  name: 'VISA',
-                  icon: 'visa',
-                  note: '匯率計算器',
-                  url: 'https://www.visa.com.tw/support/consumer/travel-support/exchange-rate-calculator.html',
-                },
-                {
-                  name: 'Mastercard',
-                  icon: 'mastercard',
-                  note: '匯率計算器',
-                  url: 'https://www.mastercard.com/global/en/personal/get-support/currency-exchange-rate-converter.html',
-                },
-                {
-                  name: 'JCB',
-                  icon: 'jcb',
-                  note: '美元基準 · 交叉匯率估算',
-                  url: jcbSource,
-                },
-              ].map((source) => (
-                <a
-                  class="guide-source"
-                  href={source.url}
-                  data-jcb-source-link={source.name === 'JCB' ? '' : undefined}
-                >
-                  <img
-                    src={`/icons/${source.icon}.svg`}
-                    width="24"
-                    height="24"
-                    alt=""
-                  />
-                  <span>
-                    <strong>{source.name}</strong>
-                    <small>{source.note}</small>
-                  </span>
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.75"
-                    aria-hidden="true"
+              <h3>資料來源</h3>
+              <div class="guide-source-links">
+                {[
+                  {
+                    name: 'VISA',
+                    icon: 'visa',
+                    url: 'https://www.visa.com.tw/support/consumer/travel-support/exchange-rate-calculator.html',
+                  },
+                  {
+                    name: 'Mastercard',
+                    icon: 'mastercard',
+                    url: 'https://www.mastercard.com/global/en/personal/get-support/currency-exchange-rate-converter.html',
+                  },
+                  {
+                    name: 'JCB',
+                    icon: 'jcb',
+                    url: jcbSource,
+                  },
+                ].map((source) => (
+                  <a
+                    class="guide-source"
+                    href={source.url}
+                    data-jcb-source-link={
+                      source.name === 'JCB' ? '' : undefined
+                    }
                   >
-                    <path d="M7 17 17 7M7 7h10v10" />
-                  </svg>
-                </a>
-              ))}
+                    <img
+                      src={`/icons/${source.icon}.svg`}
+                      width="24"
+                      height="24"
+                      alt=""
+                    />
+                    <strong>{source.name}</strong>
+                  </a>
+                ))}
+              </div>
             </div>
             <p class="guide-caveat">
-              帳單依實際處理日與銀行規則計算；商店 DCC 換匯不適用。
+              未含手續費與回饋；帳單依銀行處理日為準，DCC 不適用。
             </p>
           </div>
         </section>
