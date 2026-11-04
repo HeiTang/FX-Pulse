@@ -1,0 +1,17 @@
+---
+import Calculator from './index.astro';
+import { currencies } from '../lib/rates';
+
+export function getStaticPaths() {
+  return Object.keys(currencies)
+    .filter((code) => !['JPY', 'USD'].includes(code))
+    .map((code) => ({
+      params: { currency: code.toLowerCase() },
+      props: { code },
+    }));
+}
+
+const { code } = Astro.props;
+---
+
+<Calculator defaultCurrency={code} currencyPage />

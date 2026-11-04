@@ -1,9 +1,55 @@
 import { expect, test } from '@playwright/test';
 import ratesData from '../../src/data/rates.json' with { type: 'json' };
 import { availableDates } from '../../src/lib/rates';
+import { resultRows } from '../../src/lib/results';
 
 const dates = availableDates(ratesData.rates);
 const latest = dates.at(-1)!;
+
+test('URLs omit defaults and legacy currency links normalize without losing trial conditions', async ({
+  page,
+}) => {
+  await page.goto(
+    '/usd/?currency=USD&amount=10%2C000&direction=foreign-to-twd',
+  );
+  await expect(page).toHaveURL(
+    (url) => url.pathname === '/usd/' && url.search === '',
+  );
+  await expect(page.locator('[data-quick-currency="JPY"]')).toHaveAttribute(
+    'href',
+    /\/jpy\/$/,
+  );
+  await page.locator('#amount').fill('100');
+  await expect(page).toHaveURL((url) => url.search === '?amount=100');
+  await page.locator('#swap-direction').click();
+  await expect(page).toHaveURL(
+    (url) =>
+      url.searchParams.get('amount') === '100' &&
+      url.searchParams.get('direction') === 'twd-to-foreign' &&
+      !url.searchParams.has('currency'),
+  );
+  await page.reload();
+  await expect(page.locator('#comparison-context')).toHaveText('TWD → USD');
+  await expect(page.locator('#amount')).toHaveValue('100');
+  await page.locator('#amount').fill('10000');
+  await expect(page).toHaveURL((url) => !url.searchParams.has('amount'));
+  await page.locator('#swap-direction').click();
+  await expect(page).toHaveURL(
+    (url) => url.pathname === '/usd/' && url.search === '',
+  );
+  await page.goto('/usd/?currency=JPY&amount=1000&utm_source=check#results');
+  await expect(page).toHaveURL(
+    (url) =>
+      url.pathname === '/jpy/' &&
+      url.searchParams.get('amount') === '1000' &&
+      !url.searchParams.has('currency'),
+  );
+  expect(new URL(page.url()).searchParams.get('utm_source')).toBe('check');
+  expect(new URL(page.url()).hash).toBe('#results');
+  await page.goto('/jpy/?amount=10000.00');
+  await expect(page.locator('#amount')).toHaveAttribute('aria-invalid', 'true');
+  expect(new URL(page.url()).searchParams.get('amount')).toBe('10000.00');
+});
 
 for (const direction of ['foreign-to-twd', 'twd-to-foreign']) {
   test(`shared ${direction} query restores all conditions in the address bar`, async ({
@@ -25,9 +71,8 @@ for (const direction of ['foreign-to-twd', 'twd-to-foreign']) {
     const copied = page.url();
     const url = new URL(copied);
     expect(Object.fromEntries(url.searchParams)).toEqual({
-      currency: 'JPY',
       amount: '12345',
-      direction,
+      ...(direction === 'twd-to-foreign' ? { direction } : {}),
     });
     await page.goto(copied!);
     await expect(page.locator('#comparison-context')).toHaveText(
@@ -38,7 +83,15 @@ for (const direction of ['foreign-to-twd', 'twd-to-foreign']) {
     const jcb = page.locator('.result-row').filter({
       has: page.locator('.result-source strong', { hasText: 'JCB' }),
     });
-    await expect(jcb.locator('.result-total')).toContainText('約 ');
+    await expect(jcb.locator('.result-total')).toHaveText(
+      resultRows(
+        ratesData.rates,
+        'JPY',
+        latest,
+        12345,
+        direction === 'twd-to-foreign',
+      ).find((row) => row.src === 'JCB')!.totalText,
+    );
     await expect(jcb.locator('.source-estimate')).toHaveText('交叉匯率估算');
     await expect(jcb.locator('.source-estimate')).toBeVisible();
     expect(
@@ -68,11 +121,11 @@ test('edits replace URL conditions without navigation or history entries and ret
     (url) =>
       url.searchParams.get('direction') === 'twd-to-foreign' &&
       url.searchParams.get('amount') === '200.25' &&
-      url.searchParams.get('currency') === 'EUR',
+      url.pathname === '/eur/' &&
+      !url.searchParams.has('currency'),
   );
   let url = new URL(page.url());
   expect(Object.fromEntries(url.searchParams)).toEqual({
-    currency: 'EUR',
     amount: '200.25',
     direction: 'twd-to-foreign',
     extra: 'keep',
@@ -153,5 +206,8 @@ test('invalid query parameters show errors and omitted values use defaults', asy
   await expect(page.locator('#amount')).toHaveValue('10,000');
   await expect(page.locator('#rate-date')).toHaveValue(dates.at(-1)!);
   await expect(page.locator('#query-message')).toBeEmpty();
-  await expect(page.locator('.site-footer')).toContainText('更新時間');
+  await expect(page.locator('.header-updated')).toHaveText(
+    /最後更新 \d{4}-\d{2}-\d{2} \d{2}:\d{2}/,
+  );
+  await expect(page.locator('.site-footer')).not.toContainText('更新時間');
 });

@@ -264,6 +264,10 @@ test('currency shortcuts replace duplicate controls and show same-day reference 
       await page.locator('#swap-direction').click();
     }
   }
+  const labels = await new AxeBuilder({ page })
+    .withRules(['label-content-name-mismatch'])
+    .analyze();
+  expect(labels.violations).toEqual([]);
 });
 
 test('calendar disables absent dates and supports keyboard selection and escape', async ({

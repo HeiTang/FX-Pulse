@@ -1,4 +1,20 @@
 import { expect, test, type Page } from '@playwright/test';
+import ratesData from '../../src/data/rates.json' with { type: 'json' };
+import { availableDates, rateEntries } from '../../src/lib/rates';
+
+const comparable = availableDates(ratesData.rates).findLast(
+  (date) => rateEntries(ratesData.rates, 'EUR', date).length === 3,
+)!;
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript((date) => {
+    // Keep the layout fixture complete even when the newest JCB rate is missing.
+    document.addEventListener('DOMContentLoaded', () => {
+      const input = document.querySelector<HTMLInputElement>('#rate-date')!;
+      input.value = date;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  }, comparable);
+});
 
 async function expectLayout(page: Page, stacked: boolean) {
   await expect(page.locator('#results')).toHaveClass(

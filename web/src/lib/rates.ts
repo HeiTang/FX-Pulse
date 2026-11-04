@@ -83,14 +83,55 @@ export function historyDates(
   return dates.filter((date) => date >= from && date <= cutoff);
 }
 
+export function historyRanges(days: RateDays, dates: string[], code: string) {
+  const ordered = [...new Set(dates)].filter(validDate).sort();
+  return sources.map((src) => {
+    const points = ordered.flatMap((date) => {
+      const entry = rateEntries(days, code, date).find(
+        (entry) => entry.src === src,
+      );
+      return entry ? [{ date, rate: entry.rate }] : [];
+    });
+    const latest = points.at(-1) ?? null;
+    const lowest = latest
+      ? Math.min(...points.map((point) => point.rate))
+      : null;
+    const highest = latest
+      ? Math.max(...points.map((point) => point.rate))
+      : null;
+    return {
+      src,
+      count: points.length,
+      latest,
+      lowest,
+      highest,
+      position:
+        latest && lowest !== null && highest !== null
+          ? highest === lowest
+            ? 50
+            : ((latest.rate - lowest) / (highest - lowest)) * 100
+          : null,
+    };
+  });
+}
+
 export function formatFetchedAt(value: string): string {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return '未提供';
-  return new Intl.DateTimeFormat('zh-TW', {
-    timeZone: 'Asia/Taipei',
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date);
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Taipei',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(date)
+      .map(({ type, value }) => [type, value]),
+  );
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
 }
 
 export function periodComparison(

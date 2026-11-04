@@ -35,15 +35,40 @@ if (location.origin === new URL(import.meta.env.SITE).origin) {
     allow_ad_personalization_signals: false,
   });
   window.gtag('event', 'page_view');
-  const script = document.createElement('script');
-  script.async = true;
-  script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;
-  document.head.append(script);
+  // Queue events immediately, but let the calculator finish rendering first.
+  const loadTag = () => {
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;
+    document.head.append(script);
+  };
+  if (typeof window.requestIdleCallback === 'function')
+    window.requestIdleCallback(loadTag, { timeout: 1000 });
+  else window.setTimeout(loadTag, 0);
 }
 
 export function trackCalculation(currency: string, reverse: boolean) {
   window.gtag?.('event', 'calculate', {
     foreign_currency: currency,
     conversion_direction: reverse ? 'twd-to-foreign' : 'foreign-to-twd',
+  });
+}
+
+export function trackTabView(tab: string, currency: string) {
+  window.gtag?.('event', 'rate_tab_view', {
+    tab_name: tab,
+    foreign_currency: currency,
+  });
+}
+
+export function trackChartFilter(
+  type: 'range' | 'source',
+  value: string,
+  currency: string,
+) {
+  window.gtag?.('event', 'chart_filter_change', {
+    filter_type: type,
+    filter_value: value,
+    foreign_currency: currency,
   });
 }

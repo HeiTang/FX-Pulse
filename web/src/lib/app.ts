@@ -1,4 +1,5 @@
-import { trackCalculation } from './analytics';
+import { trackCalculation, trackTabView, trackChartFilter } from './analytics';
+import { currencyPage, jcbSourceUrl } from './currency-page';
 import { formatMoney, unit, rateFormat, resultRows } from './results';
 import ratesData from '../data/rates.json';
 import { mountDatePicker } from './date-picker';
@@ -20,6 +21,7 @@ import {
 const rateDays: RateDays = ratesData.rates;
 const dates = availableDates(rateDays);
 const currency = document.querySelector<HTMLInputElement>('#currency')!;
+const initialCurrency = currency.value;
 const amount = document.querySelector<HTMLInputElement>('#amount')!;
 const rateDate = document.querySelector<HTMLInputElement>('#rate-date')!;
 const results = document.querySelector<HTMLElement>('#results')!;
@@ -29,6 +31,7 @@ const requestedCurrency = params.get('currency');
 const supportedCurrency =
   requestedCurrency !== null &&
   ratesData.meta.currencies.includes(requestedCurrency);
+let currencyPageActive = location.pathname !== '/' || supportedCurrency;
 if (supportedCurrency) currency.value = requestedCurrency!;
 if (params.has('amount')) amount.value = params.get('amount')!;
 let selectedDate = rateDate.value;
@@ -96,16 +99,22 @@ function recordCalculation() {
 }
 let queryTimer: number | undefined;
 let lastQuerySync = -Infinity;
+function calculationUrl(code: string) {
+  const url = new URL(location.href);
+  url.pathname = currencyPage(code).path;
+  url.searchParams.delete('currency');
+  if (validateAmount(amount.value, reverse ? 'TWD' : code).value === 10_000)
+    url.searchParams.delete('amount');
+  else url.searchParams.set('amount', amount.value);
+  url.searchParams.delete('date');
+  if (reverse) url.searchParams.set('direction', 'twd-to-foreign');
+  else url.searchParams.delete('direction');
+  return url;
+}
 function syncQuery() {
   clearTimeout(queryTimer);
-  const url = new URL(location.href);
-  url.searchParams.set('currency', currency.value);
-  url.searchParams.set('amount', amount.value);
-  url.searchParams.delete('date');
-  url.searchParams.set(
-    'direction',
-    reverse ? 'twd-to-foreign' : 'foreign-to-twd',
-  );
+  const url = calculationUrl(currency.value);
+  if (!currencyPageActive) url.pathname = location.pathname;
   if (url.href === location.href) return;
   // Safari limits history writes; coalesce rapid edits without delaying results.
   const delay = 250 - (performance.now() - lastQuerySync);
@@ -118,6 +127,11 @@ function syncQuery() {
 }
 function renderResults() {
   syncQuery();
+  for (const link of document.querySelectorAll<HTMLAnchorElement>(
+    '[data-quick-currency]',
+  )) {
+    link.href = calculationUrl(link.dataset.quickCurrency!).href;
+  }
   const code = currency.value;
   const value = validAmount();
   const available = entries(code, rateDate.value);
@@ -212,14 +226,15 @@ function renderCurrencyShortcuts() {
       ? '每 1 TWD 可換得的最高參考外幣金額 · 所選日期'
       : '每 1 外幣 → TWD · 最低參考匯率 · 所選日期',
   );
-  for (const button of document.querySelectorAll<HTMLButtonElement>(
+  for (const button of document.querySelectorAll<HTMLAnchorElement>(
     '[data-quick-currency]',
   )) {
     const code = button.dataset.quickCurrency!;
     const available = entries(code, rateDate.value).sort((a, b) =>
       reverse ? b.rate - a.rate : a.rate - b.rate,
     );
-    button.setAttribute('aria-pressed', String(code === currency.value));
+    if (code === currency.value) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
     const best = available[0];
     const rateText = best
       ? `${best.src === 'JCB' ? '約 ' : ''}${shortcutRateFormat.format(best.rate)}`
@@ -227,8 +242,8 @@ function renderCurrencyShortcuts() {
     button.querySelector<HTMLElement>('[data-shortcut-rate]')!.textContent =
       rateText;
     button.setAttribute(
-      'aria-label',
-      `${currencies[code]?.name ?? code} ${code}，每 1 ${reverse ? 'TWD' : code} 可換得 ${reverse ? code : 'TWD'} ${rateText}，${best ? `${best.src}${best.src === 'JCB' ? '（估算）' : ''}` : '此日期無資料'}`,
+      'aria-description',
+      `每 1 ${reverse ? 'TWD' : code} 可換得 ${reverse ? code : 'TWD'} ${rateText}，${best ? `${best.src}${best.src === 'JCB' ? '（估算）' : ''}` : '此日期無資料'}`,
     );
   }
 }
@@ -312,7 +327,8 @@ async function renderChart() {
     chart?.clear();
     return;
   }
-  if (!chartReady) return;
+  if (!chartReady || chartEl.closest<HTMLElement>('[data-view-panel]')?.hidden)
+    return;
   try {
     chartModule ??= import('./chart');
     const { createChart } = await chartModule;
@@ -383,15 +399,65 @@ async function renderChart() {
   );
   chart.resize();
 }
+let displayedCurrency: string | null =
+  location.pathname === '/' ? null : initialCurrency;
+function renderCurrencyPage() {
+  if (!currencyPageActive) return;
+  const code = currency.value;
+  if (code === displayedCurrency) return;
+  const page = currencyPage(code);
+  setText('#page-heading', page.heading);
+  document.title = page.title;
+  const canonical = new URL(page.path, import.meta.env.SITE).href;
+  document.querySelector<HTMLLinkElement>('link[rel="canonical"]')!.href =
+    canonical;
+  for (const selector of [
+    'meta[name="description"]',
+    'meta[property="og:description"]',
+    'meta[name="twitter:description"]',
+  ])
+    document.querySelector<HTMLMetaElement>(selector)!.content =
+      page.description;
+  for (const selector of [
+    'meta[property="og:title"]',
+    'meta[name="twitter:title"]',
+  ])
+    document.querySelector<HTMLMetaElement>(selector)!.content = page.title;
+  document.querySelector<HTMLMetaElement>('meta[property="og:url"]')!.content =
+    canonical;
+  const template = document.querySelector<HTMLTemplateElement>(
+    `template[data-history-currency="${code}"]`,
+  )!;
+  const content = template.content.firstElementChild!.cloneNode(
+    true,
+  ) as HTMLElement;
+  const panel = document.querySelector<HTMLElement>('#view-history')!;
+  panel.replaceChildren(...content.childNodes);
+  panel.setAttribute('aria-label', `${currencies[code].name}歷史匯率表`);
+  document.querySelector<HTMLAnchorElement>('[data-jcb-source-link]')!.href =
+    jcbSourceUrl(rateDays, dates, code);
+  displayedCurrency = code;
+}
 function render() {
+  renderCurrencyPage();
   renderResults();
   renderCurrencyShortcuts();
   renderChart();
 }
 document
-  .querySelectorAll<HTMLButtonElement>('[data-quick-currency]')
+  .querySelectorAll<HTMLAnchorElement>('[data-quick-currency]')
   .forEach((button) =>
-    button.addEventListener('click', () => {
+    button.addEventListener('click', (event) => {
+      if (
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      )
+        return;
+      event.preventDefault();
+      currencyPageActive = true;
       currency.value = button.dataset.quickCurrency!;
       render();
       recordCalculation();
@@ -485,28 +551,112 @@ rateDate.addEventListener('change', () => {
 });
 document.querySelectorAll<HTMLButtonElement>('[data-range]').forEach((button) =>
   button.addEventListener('click', () => {
-    range = button.dataset.range as typeof range;
+    const next = button.dataset.range as typeof range;
+    if (next === range) return;
+    range = next;
     document
       .querySelectorAll<HTMLButtonElement>('[data-range]')
       .forEach((item) =>
         item.setAttribute('aria-pressed', String(item === button)),
       );
     renderChart();
+    trackChartFilter('range', range, currency.value);
   }),
 );
 document
   .querySelectorAll<HTMLButtonElement>('[data-source]')
   .forEach((button) =>
     button.addEventListener('click', () => {
-      source = button.dataset.source as typeof source;
+      const next = button.dataset.source as typeof source;
+      if (next === source) return;
+      source = next;
       document
         .querySelectorAll<HTMLButtonElement>('[data-source]')
         .forEach((item) =>
           item.setAttribute('aria-pressed', String(item === button)),
         );
       renderChart();
+      trackChartFilter('source', source, currency.value);
     }),
   );
+const viewTabs = [
+  ...document.querySelectorAll<HTMLAnchorElement>('[data-view]'),
+];
+const viewPanels = [
+  ...document.querySelectorAll<HTMLElement>('[data-view-panel]'),
+];
+const viewedTabs = new Set<string>();
+const tabVisibilityObserver = new IntersectionObserver(
+  (entries) => {
+    if (!window.gtag || document.visibilityState !== 'visible') return;
+    for (const entry of entries) {
+      const panel = entry.target as HTMLElement;
+      if (
+        !entry.isIntersecting ||
+        entry.intersectionRatio < 0.1 ||
+        panel.hidden
+      )
+        continue;
+      const tab = viewTabs[viewPanels.indexOf(panel)].dataset.view!;
+      if (viewedTabs.has(tab)) continue;
+      trackTabView(tab, currency.value);
+      viewedTabs.add(tab);
+    }
+  },
+  { threshold: 0.1 },
+);
+viewPanels.forEach((panel) => tabVisibilityObserver.observe(panel));
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  // Returning to the foreground alone does not trigger an intersection update.
+  for (const panel of viewPanels) {
+    tabVisibilityObserver.unobserve(panel);
+    tabVisibilityObserver.observe(panel);
+  }
+});
+function selectView(index: number, focus = false) {
+  viewTabs.forEach((tab, i) => {
+    tab.setAttribute('aria-selected', String(i === index));
+    tab.tabIndex = i === index ? 0 : -1;
+    viewPanels[i].hidden = i !== index;
+  });
+  if (focus) viewTabs[index].focus();
+  if (index === 0) {
+    chart?.resize();
+    void renderChart();
+  }
+}
+viewTabs.forEach((tab, index) => {
+  tab.setAttribute('role', 'tab');
+  const panel = viewPanels[index];
+  panel.setAttribute('role', 'tabpanel');
+  panel.setAttribute('aria-labelledby', tab.id);
+  panel.tabIndex = 0;
+  tab.addEventListener('click', (event) => {
+    event.preventDefault();
+    selectView(index);
+  });
+  tab.addEventListener('keydown', (event) => {
+    if (event.key === ' ') {
+      event.preventDefault();
+      selectView(index);
+      return;
+    }
+    let next: number;
+    if (event.key === 'ArrowRight') next = (index + 1) % viewTabs.length;
+    else if (event.key === 'ArrowLeft')
+      next = (index + viewTabs.length - 1) % viewTabs.length;
+    else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = viewTabs.length - 1;
+    else return;
+    event.preventDefault();
+    selectView(next, true);
+  });
+});
+selectView(0);
+document
+  .querySelector<HTMLElement>('.view-tabs')!
+  .setAttribute('role', 'tablist');
 const chartObserver = new ResizeObserver(() => chart?.resize());
 chartObserver.observe(chartEl);
 const chartVisibilityObserver = new IntersectionObserver(
