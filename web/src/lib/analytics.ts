@@ -53,3 +53,22 @@ export function trackCalculation(currency: string, reverse: boolean) {
     conversion_direction: reverse ? 'twd-to-foreign' : 'foreign-to-twd',
   });
 }
+
+export function trackTabView(tab: string, currency: string) {
+  window.gtag?.('event', 'rate_tab_view', {
+    tab_name: tab,
+    foreign_currency: currency,
+  });
+}
+
+export function trackChartFilter(
+  type: 'range' | 'source',
+  value: string,
+  currency: string,
+) {
+  window.gtag?.('event', 'chart_filter_change', {
+    filter_type: type,
+    filter_value: value,
+    foreign_currency: currency,
+  });
+}

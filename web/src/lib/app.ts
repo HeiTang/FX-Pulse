@@ -1,4 +1,4 @@
-import { trackCalculation } from './analytics';
+import { trackCalculation, trackTabView, trackChartFilter } from './analytics';
 import { currencyPage, jcbSourceUrl } from './currency-page';
 import { formatMoney, unit, rateFormat, resultRows } from './results';
 import ratesData from '../data/rates.json';
@@ -551,26 +551,32 @@ rateDate.addEventListener('change', () => {
 });
 document.querySelectorAll<HTMLButtonElement>('[data-range]').forEach((button) =>
   button.addEventListener('click', () => {
-    range = button.dataset.range as typeof range;
+    const next = button.dataset.range as typeof range;
+    if (next === range) return;
+    range = next;
     document
       .querySelectorAll<HTMLButtonElement>('[data-range]')
       .forEach((item) =>
         item.setAttribute('aria-pressed', String(item === button)),
       );
     renderChart();
+    trackChartFilter('range', range, currency.value);
   }),
 );
 document
   .querySelectorAll<HTMLButtonElement>('[data-source]')
   .forEach((button) =>
     button.addEventListener('click', () => {
-      source = button.dataset.source as typeof source;
+      const next = button.dataset.source as typeof source;
+      if (next === source) return;
+      source = next;
       document
         .querySelectorAll<HTMLButtonElement>('[data-source]')
         .forEach((item) =>
           item.setAttribute('aria-pressed', String(item === button)),
         );
       renderChart();
+      trackChartFilter('source', source, currency.value);
     }),
   );
 const viewTabs = [
@@ -579,6 +585,35 @@ const viewTabs = [
 const viewPanels = [
   ...document.querySelectorAll<HTMLElement>('[data-view-panel]'),
 ];
+const viewedTabs = new Set<string>();
+const tabVisibilityObserver = new IntersectionObserver(
+  (entries) => {
+    if (!window.gtag || document.visibilityState !== 'visible') return;
+    for (const entry of entries) {
+      const panel = entry.target as HTMLElement;
+      if (
+        !entry.isIntersecting ||
+        entry.intersectionRatio < 0.1 ||
+        panel.hidden
+      )
+        continue;
+      const tab = viewTabs[viewPanels.indexOf(panel)].dataset.view!;
+      if (viewedTabs.has(tab)) continue;
+      trackTabView(tab, currency.value);
+      viewedTabs.add(tab);
+    }
+  },
+  { threshold: 0.1 },
+);
+viewPanels.forEach((panel) => tabVisibilityObserver.observe(panel));
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  // Returning to the foreground alone does not trigger an intersection update.
+  for (const panel of viewPanels) {
+    tabVisibilityObserver.unobserve(panel);
+    tabVisibilityObserver.observe(panel);
+  }
+});
 function selectView(index: number, focus = false) {
   viewTabs.forEach((tab, i) => {
     tab.setAttribute('aria-selected', String(i === index));
