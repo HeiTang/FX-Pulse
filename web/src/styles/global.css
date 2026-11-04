@@ -1362,8 +1362,7 @@ main.shell {
 }
 .guide-detail-content {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
-  column-gap: 32px;
+  grid-template-columns: minmax(0, 1fr);
   row-gap: 16px;
   padding: 16px 0 0;
   width: 100%;
@@ -1376,12 +1375,14 @@ main.shell {
 }
 .guide-formula {
   display: grid;
-  grid-template-columns: 80px minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 8px;
 }
-.guide-formula + .guide-formula {
-  margin-top: 8px;
+.guide-formulas {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
 }
 .guide-formula > span {
   display: block;
@@ -1405,13 +1406,17 @@ main.shell {
   color: #a1aec1;
 }
 .rate-guide .guide-formula-note {
-  margin-top: 12px;
+  grid-column: 1 / -1;
   font-size: 13px;
   line-height: 1.6;
 }
 .guide-sources {
-  padding-left: 24px;
-  border-left: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.guide-sources h3 {
+  margin: 0;
 }
 .guide-source-links {
   display: flex;
@@ -1447,13 +1452,21 @@ main.shell {
   font-size: 13px;
   line-height: 1.6;
 }
-@media (max-width: 900px) {
-  .guide-detail-content {
+@media (max-width: 767px) {
+  .guide-formulas {
     grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .guide-formula {
+    grid-template-columns: 80px minmax(0, 1fr);
+    align-items: center;
+    column-gap: 12px;
   }
   .guide-sources {
-    padding-left: 0;
-    border-left: 0;
+    display: block;
+  }
+  .guide-sources h3 {
+    margin-bottom: 8px;
   }
 }
 .rate-history {
